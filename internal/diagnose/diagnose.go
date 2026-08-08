@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/eonicman/pinscher/internal/probe"
@@ -327,21 +327,20 @@ func generateSuggestions(result *DiagnoseResult) []string {
 }
 
 // resolveModalias uses modprobe to find the module for a modalias
+// Returns the first resolved module
 func resolveModalias(modalias string) string {
 	if modalias == "" {
 		return ""
 	}
-	data, err := os.ReadFile("/lib/modules/" + readKernelVersion() + "/modules.alias")
+	cmd := exec.Command("modprobe", "--resolve-alias", modalias)
+	output, err := cmd.Output()
 	if err != nil {
 		return ""
 	}
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, modalias) {
-			parts := strings.Fields(line)
-			if len(parts) >= 3 {
-				return parts[len(parts)-1]
-			}
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
 		}
 	}
 	return ""
@@ -512,5 +511,4 @@ func (r *DiagnoseResult) PrintHuman() string {
 	return sb.String()
 }
 
-// Suppress unused import warning
-var _ = regexp.MustCompile
+// JSON returns the diagnose result as formatted JSON

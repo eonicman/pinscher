@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -96,7 +95,8 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 	}
 
 	// 3. For each boot-critical device, check if its driver is in the initramfs
-	checkedDevices := make(map[string]bool)
+	// Dedup by module+category (not device) — same module from two GPUs is one issue
+	seenModules := make(map[string]bool)
 
 	for _, dev := range probeResult.Devices {
 		if dev.Bus != "pci" {
@@ -104,7 +104,6 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 		}
 
 		// Determine if this device class is boot-critical
-		// PCI class format: bcXXscXXppXX (8 hex chars, e.g. 0c0330)
 		classCode := dev.Class
 		if len(classCode) >= 6 {
 			classCode = classCode[:6] // bcXXsc (base class + subclass)
@@ -122,47 +121,48 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 			continue
 		}
 
-		// Resolve modalias to module name
-		module := resolveModalias(dev.Modalias)
-		if module == "" {
-			// No module — skip if it's not expected to have one
+		// Resolve modalias to module(s) — may return multiple
+		modules := resolveModaliasAll(dev.Modalias)
+		if len(modules) == 0 {
 			continue
 		}
 
-		// Deduplicate by module
-		key := module + ":" + dev.Path
-		if checkedDevices[key] {
-			continue
-		}
-		checkedDevices[key] = true
-		result.CheckedCount++
-
-		// Check if module is in initramfs
-		if !moduleSet[module] {
-			// Also check for builtin modules (they don't need to be in initramfs)
-			if isBuiltinModule(module, result.Kernel) {
-				continue // Builtin is fine
+		for _, module := range modules {
+			// Deduplicate by module+category
+			dedupKey := module + ":" + category
+			if seenModules[dedupKey] {
+				continue
 			}
+			seenModules[dedupKey] = true
+			result.CheckedCount++
 
-			issue := BootIssue{
-				Severity: severityForCategory(category),
-				Class:    category,
-				Device:   dev.Description,
-				Module:   module,
-				Message:  fmt.Sprintf("%s module '%s' is missing from initramfs — %s may not work at boot", category, module, category),
-				Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
+			// Check if module is in initramfs
+			if !moduleSet[module] {
+				// Also check for builtin modules (they don't need to be in initramfs)
+				if isBuiltinModule(module, result.Kernel) {
+					continue // Builtin is fine
+				}
+
+				issue := BootIssue{
+					Severity: severityForCategory(category),
+					Class:    category,
+					Device:   dev.Description,
+					Module:   module,
+					Message:  fmt.Sprintf("%s module '%s' is missing from initramfs — %s may not work at boot", category, module, category),
+					Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
+				}
+
+				// Enhance message for specific categories
+				if category == "usb" {
+					issue.Message = fmt.Sprintf("USB host controller driver '%s' missing from initramfs — keyboard may be dead at LUKS prompt", module)
+					issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
+				} else if category == "storage" {
+					issue.Message = fmt.Sprintf("Storage controller driver '%s' missing from initramfs — root filesystem may not mount", module)
+					issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
+				}
+
+				result.Issues = append(result.Issues, issue)
 			}
-
-			// Enhance message for specific categories
-			if category == "usb" {
-				issue.Message = fmt.Sprintf("USB host controller driver '%s' missing from initramfs — keyboard may be dead at LUKS prompt", module)
-				issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
-			} else if category == "storage" {
-				issue.Message = fmt.Sprintf("Storage controller driver '%s' missing from initramfs — root filesystem may not mount", module)
-				issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
-			}
-
-			result.Issues = append(result.Issues, issue)
 		}
 	}
 
@@ -212,17 +212,34 @@ func listInitramfsModules(path string) ([]string, error) {
 	return modules, nil
 }
 
-// resolveModalias uses modprobe --resolve-alias to find the module for a modalias
+// resolveModalias uses modprobe --resolve-alias to find the module(s) for a modalias
+// Returns the first resolved module, or empty string if none found
 func resolveModalias(modalias string) string {
+	modules := resolveModaliasAll(modalias)
+	if len(modules) > 0 {
+		return modules[0]
+	}
+	return ""
+}
+
+// resolveModaliasAll returns all modules resolved for a modalias
+func resolveModaliasAll(modalias string) []string {
 	if modalias == "" {
-		return ""
+		return nil
 	}
 	cmd := exec.Command("modprobe", "--resolve-alias", modalias)
 	output, err := cmd.Output()
 	if err != nil {
-		return ""
+		return nil
 	}
-	return strings.TrimSpace(string(output))
+	var modules []string
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			modules = append(modules, line)
+		}
+	}
+	return modules
 }
 
 // isBuiltinModule checks if a module is built into the kernel (not a loadable module)
@@ -323,5 +340,4 @@ func (r *LintResult) PrintHuman() string {
 	return sb.String()
 }
 
-// Compile-time regex to suppress unused warning
-var _ = regexp.MustCompile
+// JSON returns the lint result as formatted JSON
