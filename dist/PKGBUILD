@@ -1,0 +1,33 @@
+# Maintainer: Ami <ami@eonic.cloud>
+# Contributor: Built by Bots <https://github.com/eonicman>
+
+pkgname=pinscher
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="Hardware orchestration layer — probe, diagnose, and lint boot-critical hardware"
+arch=('x86_64')
+url="https://github.com/eonicman/pinscher"
+license=('MIT')
+depends=('glibc' 'pciutils' 'kmod')
+makedepends=('go')
+optdepends=('hwdata: PCI/USB ID database for human-readable device names')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/eonicman/pinscher/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # Replace with actual hash on release
+
+build() {
+  cd "$pkgname-$pkgver"
+  go build -ldflags="-s -w -X main.version=$pkgver" -o pinscher ./cmd/pinscher/
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  go test ./...
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 pinscher "$pkgdir/usr/bin/pinscher"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE" 2>/dev/null || true
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 dist/pinscher-bash-completion.bash "$pkgdir/usr/share/bash-completion/completions/pinscher" 2>/dev/null || true
+}

@@ -1,0 +1,29 @@
+# Pinscher mkinitcpio hook
+# Run 'pinscher lint-boot' after generating initramfs to check for missing drivers
+#
+# Install:
+#   1. Copy this file to /etc/initcpio/hooks/pinscher
+#   2. Add 'pinscher' to the HOOKS array in /etc/mkinitcpio.conf
+#   3. Regenerate: sudo mkinitcpio -P
+#
+# After initramfs generation, this hook will automatically check that
+# all boot-critical drivers are present in the new image.
+
+build_hook() {
+    # pinscher check runs after the image is built, not inside the image
+    :
+}
+
+post_hook() {
+    if command -v pinscher >/dev/null 2>&1; then
+        msg "Running Pinscher boot lint..."
+        pinscher lint-boot
+        local ret=$?
+        if [ $ret -eq 0 ]; then
+            msg2 "Boot lint passed — all boot-critical drivers are present"
+        else
+            warning "Boot lint found issues — some boot-critical drivers may be missing"
+            warning "Run 'pinscher lint-boot' for details"
+        fi
+    fi
+}
