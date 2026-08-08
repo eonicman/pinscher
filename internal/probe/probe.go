@@ -101,10 +101,10 @@ func probePCI() ([]Device, error) {
 			Path: path,
 		}
 
-		d.Vendor = readSysFile(filepath.Join(path, "vendor"))
-		d.DeviceID = readSysFile(filepath.Join(path, "device"))
-		d.Subsystem = readSysFile(filepath.Join(path, "subsystem_vendor")) + ":" + readSysFile(filepath.Join(path, "subsystem_device"))
-		d.Class = stripHex(readSysFile(filepath.Join(path, "class")))
+		d.Vendor = strings.TrimPrefix(readSysFile(filepath.Join(path, "vendor")), "0x")
+		d.DeviceID = strings.TrimPrefix(readSysFile(filepath.Join(path, "device")), "0x")
+		d.Subsystem = strings.TrimPrefix(readSysFile(filepath.Join(path, "subsystem_vendor")), "0x") + ":" + strings.TrimPrefix(readSysFile(filepath.Join(path, "subsystem_device")), "0x")
+		d.Class = readSysFile(filepath.Join(path, "class"))
 		d.Revision = readSysFile(filepath.Join(path, "revision"))
 		d.Modalias = readSysFile(filepath.Join(path, "modalias"))
 
@@ -115,7 +115,7 @@ func probePCI() ([]Device, error) {
 		}
 
 		// Try to get description from PCI ID database
-		d.Description = lookupPCIDescription(d.Vendor, d.DeviceID)
+		d.Description = LookupPCIDevice(d.Vendor, d.DeviceID)
 
 		result = append(result, d)
 	}
@@ -198,11 +198,6 @@ func probeUSB() ([]Device, error) {
 	return result, nil
 }
 
-// stripHex removes 0x prefix from hex values
-func stripHex(s string) string {
-	return strings.TrimPrefix(s, "0x")
-}
-
 // readSysFile reads a sysfs/proc file and returns trimmed content
 func readSysFile(path string) string {
 	data, err := os.ReadFile(path)
@@ -210,24 +205,6 @@ func readSysFile(path string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
-}
-
-// lookupPCIDescription tries to look up a human-readable description from pci.ids
-// This is a simple lookup — Phase 2 will embed the full pci.ids database
-var pciIDCache map[string]string
-
-func lookupPCIDescription(vendor, device string) string {
-	if pciIDCache == nil {
-		pciIDCache = make(map[string]string)
-	}
-	key := vendor + ":" + device
-	if desc, ok := pciIDCache[key]; ok {
-		return desc
-	}
-
-	// Try reading from /usr/share/hwdata/pci.ids
-	// For now, return empty — Phase 2 will embed a full database
-	return ""
 }
 
 // JSON returns the probe result as formatted JSON

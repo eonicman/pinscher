@@ -4,24 +4,6 @@ import (
 	"testing"
 )
 
-func TestStripHex(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"0x1002", "1002"},
-		{"1002", "1002"},
-		{"0x0c0330", "0c0330"},
-		{"", ""},
-	}
-	for _, tt := range tests {
-		got := stripHex(tt.input)
-		if got != tt.want {
-			t.Errorf("stripHex(%q) = %q, want %q", tt.input, got, tt.want)
-		}
-	}
-}
-
 func TestProbe(t *testing.T) {
 	// This test runs on the actual system, so just verify it doesn't error
 	result, err := Probe()

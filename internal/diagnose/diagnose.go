@@ -93,9 +93,10 @@ func findDevice(query string) (*probe.Device, error) {
 		if strings.HasSuffix(dev.Path, "/"+query) {
 			return &dev, nil
 		}
-		// Match by vendor:device ID
+		// Match by vendor:device ID (normalized, no 0x prefix)
 		id := dev.Vendor + ":" + dev.DeviceID
-		if id == query {
+		queryLower := strings.ToLower(query)
+		if id == queryLower || strings.EqualFold(id, query) {
 			return &dev, nil
 		}
 		// Match by description (partial)
