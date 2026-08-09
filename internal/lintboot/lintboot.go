@@ -59,6 +59,14 @@ var bootCriticalClasses = map[string]string{
 	"0805":  "input",    // SD Host controller
 }
 
+// Boot-critical platform modalias patterns (matched by prefix)
+var bootCriticalPlatformModalias = map[string]string{
+	"acpi:PNP0C0C": "input",   // Power button
+	"acpi:PNP0C0E": "input",   // Sleep button
+	"acpi:PNP0C09": "input",   // Embedded controller
+	"platform:applesmc": "input", // Apple SMC (fans, sensors, lid)
+}
+
 // LintBoot checks that the initramfs contains drivers for all boot-critical hardware
 func LintBoot(initramfsPath string) (*LintResult, error) {
 	result := &LintResult{
@@ -99,36 +107,34 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 	seenModules := make(map[string]bool)
 
 	for _, dev := range probeResult.Devices {
-		if dev.Bus != "pci" {
-			continue
-		}
-
-		// Determine if this device class is boot-critical
-		classCode := dev.Class
-		if len(classCode) >= 6 {
-			classCode = classCode[:6] // bcXXsc (base class + subclass)
-		}
-
-		category, critical := bootCriticalClasses[classCode]
-		if !critical {
-			// Also try 4-char prefix (bcXX)
-			if len(dev.Class) >= 4 {
-				classCode = dev.Class[:4]
-				category, critical = bootCriticalClasses[classCode]
+		// --- PCI boot-critical check ---
+		if dev.Bus == "pci" {
+			// Determine if this device class is boot-critical
+			classCode := dev.Class
+			if len(classCode) >= 6 {
+				classCode = classCode[:6] // bcXXsc (base class + subclass)
 			}
-		}
-		if !critical {
-			continue
-		}
 
-		// Resolve modalias to module(s) — may return multiple
-		modules := resolveModaliasAll(dev.Modalias)
-		if len(modules) == 0 {
-			continue
-		}
+			category, critical := bootCriticalClasses[classCode]
+			if !critical {
+				// Also try 4-char prefix (bcXX)
+				if len(dev.Class) >= 4 {
+					classCode = dev.Class[:4]
+					category, critical = bootCriticalClasses[classCode]
+				}
+			}
+			if !critical {
+				continue
+			}
 
-		for _, module := range modules {
-			// Deduplicate by module+category
+			// Resolve modalias to module(s) — may return multiple
+			modules := resolveModaliasAll(dev.Modalias)
+			if len(modules) == 0 {
+				continue
+			}
+
+			for _, module := range modules {
+				// Deduplicate by module+category
 			dedupKey := module + ":" + category
 			if seenModules[dedupKey] {
 				continue
@@ -162,6 +168,49 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 				}
 
 				result.Issues = append(result.Issues, issue)
+			}
+		}
+		}
+
+		// --- Platform/ACPI boot-critical check ---
+		if dev.Bus == "platform" || dev.Bus == "acpi" {
+			// Check if the modalias matches a boot-critical pattern
+			for pattern, category := range bootCriticalPlatformModalias {
+				if strings.HasPrefix(dev.Modalias, pattern) {
+					// This is a boot-critical platform/ACPI device
+					if dev.Driver != "" {
+						// Already has a driver, no issue
+						result.CheckedCount++
+						break
+					}
+
+					// Try to resolve modalias
+					modules := resolveModaliasAll(dev.Modalias)
+					if len(modules) == 0 {
+						break
+					}
+
+					for _, module := range modules {
+						dedupKey := module + ":" + category
+						if seenModules[dedupKey] {
+							continue
+						}
+						seenModules[dedupKey] = true
+
+						if !moduleSet[module] && !isBuiltinModule(module, result.Kernel) {
+							issue := BootIssue{
+								Severity: "warning",
+								Class:    category,
+								Device:   dev.Description,
+								Module:   module,
+								Message:  fmt.Sprintf("Platform driver '%s' for %s is missing from initramfs", module, dev.Description),
+								Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
+							}
+							result.Issues = append(result.Issues, issue)
+						}
+					}
+					break // Only match one pattern per device
+				}
 			}
 		}
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/eonicman/pinscher/internal/quirk"
 )
 
-const version = "0.3.0"
+const version = "0.4.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -333,6 +333,8 @@ Usage:
 
 Commands:
   report              Probe all hardware and print a structured report
+                      Discovers PCI, USB, platform, ACPI, Bluetooth, and WiFi devices
+                      with human-readable names and capability details
     --json, -j        Output as JSON
 
   lint-boot           Check initramfs covers all boot-critical drivers
@@ -360,6 +362,14 @@ Commands:
 
   version             Print version
   help                Show this help
+
+Bus Support:
+  PCI       GPU, storage, USB controllers, network, bridges
+  USB       Keyboards, mice, hubs, audio, video, mass storage
+  Platform  Apple SMC, RTC, power button, sensors
+  ACPI      Power buttons, embedded controller, thermal zones
+  Bluetooth HCI devices with LMP features and version info
+  WiFi      PHY devices with band/channel capabilities
 
 Examples:
   pinscher report --json
