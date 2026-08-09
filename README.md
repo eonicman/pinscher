@@ -5,7 +5,7 @@ between the kernel and OS-level AI agents. It discovers hardware, diagnoses driv
 failures, and exposes a structured API for querying, configuring, and grouping
 subsystems by intent.
 
-**Status:** Phase 1–2 complete. See [CONCEPT.md](CONCEPT.md) for the full design
+**Status:** Phase 1–3 probe layer complete. See [CONCEPT.md](CONCEPT.md) for the full design
 and [docs/GHOST-NOTES.md](docs/GHOST-NOTES.md) for build-order and safety notes.
 
 A [Built by Bots](https://github.com/eonicman) project.
@@ -22,7 +22,8 @@ sudo cp pinscher /usr/local/bin/
 ## Commands
 
 ### `pinscher report`
-Probe all hardware and print a structured report.
+Probe all hardware and print a structured report. Discovers PCI, USB, platform,
+ACPI, Bluetooth, and WiFi devices with human-readable names and capability details.
 
 ```bash
 # Human-readable
@@ -34,8 +35,8 @@ pinscher report --json
 
 ### `pinscher lint-boot`
 The killer feature — check that your initramfs contains all drivers needed for
-boot-critical hardware. This is the check that would have caught the 4-day
-initramfs bug that birthed Pinscher.
+boot-critical hardware. Checks PCI devices (GPU, storage, USB, network) and
+platform/ACPI devices (power buttons, embedded controller, Apple SMC).
 
 ```bash
 # Auto-detect initramfs
@@ -140,6 +141,75 @@ Print the audit log of all config operations (set, apply) performed this session
 ### `pinscher version`
 Print the version.
 
+## Bus Support
+
+Pinscher probes six hardware buses, each with device-specific capability extraction:
+
+### PCI (`pci`)
+GPU, storage controllers, USB host controllers, network interfaces, bridges.
+Reads from `/sys/bus/pci/devices/`. Resolves vendor/device IDs against the
+PCI ID database (`/usr/share/hwdata/pci.ids`) for human-readable descriptions.
+Extracts class codes, subsystem IDs, revision, and modalias.
+
+### USB (`usb`)
+Keyboards, mice, hubs, audio devices, mass storage, Bluetooth adapters.
+Reads from `/sys/bus/usb/devices/`. Walks interface descriptors for composite
+devices. Resolves USB class codes and interface classes into human-readable names.
+
+### Platform (`platform`)
+Board-specific devices: Apple SMC, RTC, power buttons, sensors, frequency scalers.
+Reads from `/sys/bus/platform/devices/`. Captures OF compatible strings and
+modalias for driver matching.
+
+### ACPI (`acpi`)
+Power buttons, embedded controllers, thermal zones, SMBus, I/O ports.
+Reads from `/sys/bus/acpi/devices/`. Extracts HID (hardware ID), CID (compatible
+IDs), UID, and ACPI status. Filters out generic `device:*` container objects
+(590 → 274 devices on Mac Pro 6,1).
+
+### Bluetooth (`bluetooth`)
+HCI devices with full capability profiling. Reads from `/sys/class/bluetooth/`
+and resolves the USB parent device for vendor/product IDs. Extracts:
+- **Type**: BR/EDR, LE, or BR/EDR/LE
+- **HCI version/revision**: Bluetooth specification version
+- **LMP version/subversion**: Link Manager Protocol details
+- **LMP features**: Bitfield of supported features
+- **Manufacturer**: Chip vendor (via `manufacturer` sysfs + USB idVendor)
+- **Bus**: USB, UART, etc.
+
+### WiFi (`wifi`)
+Wireless PHY devices with band and mode details. Reads from
+`/sys/class/ieee80211/` and resolves the PCI parent for vendor/device IDs
+and description lookup via the PCI ID database. Extracts:
+- **MAC address**: From `address` sysfs attribute
+- **HT/VHT capable**: 802.11n / 802.11ac support flags
+- **Interface modes**: AP, station, mesh, etc. (from sysfs)
+- **Cipher suites**: Supported encryption (from sysfs)
+- **Detailed bands/modes**: Via `iw phy# info` subprocess (falls back gracefully)
+
+## Device Structure
+
+Each device in JSON output includes:
+
+```json
+{
+  "bus": "wifi",
+  "path": "/sys/class/ieee80211/phy0",
+  "vendor": "14e4",
+  "device_id": "43a0",
+  "class": "028000",
+  "class_name": "Network Controller (Wireless)",
+  "modalias": "pci:v000014E4d000043A0sv0000106Bsd0000013Cbc02sc80i00",
+  "driver": "wl",
+  "description": "BCM4360 802.11ac Dual Band Wireless Network Adapter",
+  "capabilities": {
+    "mac_address": "4c:74:bf:xx:xx:xx",
+    "ht_capable": "1",
+    "vht_capable": "1"
+  }
+}
+```
+
 ## Quirk Database
 
 Pinscher ships with an embedded quirk database of known hardware issues and their
@@ -171,8 +241,9 @@ All operations are logged to the audit log.
 
 - **Phase 1** ✅ — Probe + Report + Lint-boot (hardware discovery, initramfs coverage check)
 - **Phase 2** ✅ — Diagnose + Quirk Database + Set/Get/Audit + Apply Profiles
-- **Phase 3** 🔜 — Driver synthesis / LLM integration for unknown hardware
-- **Phase 4** 🔜 — Dynamic subsystem grouping (intent-based orchestration)
+- **Phase 3** ✅ — Multi-bus probing (platform, ACPI, Bluetooth, WiFi) + capability extraction
+- **Phase 4** 🔜 — Driver synthesis / LLM integration for unknown hardware
+- **Phase 5** 🔜 — Dynamic subsystem grouping (intent-based orchestration)
 
 ## Origin Story
 
