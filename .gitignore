@@ -1,0 +1,32 @@
+# Binaries
+pinscher
+/pinscher
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output
+*.out
+*.prof
+
+# Dependency directories
+vendor/
+
+# Build output
+/dist/pinscher
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

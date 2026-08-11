@@ -237,14 +237,19 @@ func checkQuirks(dev *probe.Device, result *DiagnoseResult) {
 func scanDmesg(dev *probe.Device) []DiagnoseIssue {
 	var issues []DiagnoseIssue
 
-	// Read dmesg
-	dmesgData, err := os.ReadFile("/dev/kmsg")
+	// Use dmesg command (works without root, reads from kernel log buffer)
+	cmd := exec.Command("dmesg", "--level=err,warn", "--time-format=reltime")
+	output, err := cmd.Output()
 	if err != nil {
-		// Can't read kmsg directly — try dmesg command (handled in caller)
-		return issues
+		// Fallback: try plain dmesg (older kernels without --level)
+		cmd = exec.Command("dmesg")
+		output, err = cmd.Output()
+		if err != nil {
+			return issues
+		}
 	}
 
-	lines := strings.Split(string(dmesgData), "\n")
+	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
 		// Match by device identifiers
 		relevant := false
@@ -257,8 +262,11 @@ func scanDmesg(dev *probe.Device) []DiagnoseIssue {
 				relevant = true
 			}
 		}
-		if dev.Description != "" && strings.Contains(strings.ToLower(line), strings.ToLower(dev.Description)) {
-			relevant = true
+		if dev.Description != "" && len(dev.Description) > 3 {
+			// Only match on description if it's specific enough (>3 chars)
+			if strings.Contains(strings.ToLower(line), strings.ToLower(dev.Description)) {
+				relevant = true
+			}
 		}
 
 		if !relevant {
@@ -269,7 +277,8 @@ func scanDmesg(dev *probe.Device) []DiagnoseIssue {
 		lowerLine := strings.ToLower(line)
 		if strings.Contains(lowerLine, "error") || strings.Contains(lowerLine, "fail") ||
 			strings.Contains(lowerLine, "timeout") || strings.Contains(lowerLine, "warning") ||
-			strings.Contains(lowerLine, "firmware") || strings.Contains(lowerLine, "not found") {
+			strings.Contains(lowerLine, "firmware") || strings.Contains(lowerLine, "not found") ||
+			strings.Contains(lowerLine, "refused") || strings.Contains(lowerLine, "invalid") {
 
 			severity := "warning"
 			if strings.Contains(lowerLine, "fatal") || strings.Contains(lowerLine, "panic") || strings.Contains(lowerLine, "oops") {
@@ -280,7 +289,7 @@ func scanDmesg(dev *probe.Device) []DiagnoseIssue {
 				Severity: severity,
 				Class:    "dmesg",
 				Module:   dev.Driver,
-				Message:  line,
+				Message:  strings.TrimSpace(line),
 				Fix:      "Check kernel documentation for this error. May indicate hardware failure, missing firmware, or driver bug.",
 				Source:   "dmesg",
 			})

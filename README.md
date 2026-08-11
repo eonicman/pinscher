@@ -139,7 +139,7 @@ sudo pinscher apply /etc/pinscher/annie.profile
 Print the audit log of all config operations (set, apply) performed this session.
 
 ### `pinscher version`
-Print the version.
+Print the version. Also available as `pinscher --version` or `pinscher -V`.
 
 ## Bus Support
 
@@ -258,3 +258,7 @@ do automatically.
 ## License
 
 MIT
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.

@@ -1,0 +1,12 @@
+[Unit]
+Description=Pinscher Boot Check Timer — run hardware lint after each boot
+Documentation=https://github.com/eonicman/pinscher
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=24h
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

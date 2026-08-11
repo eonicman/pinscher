@@ -1,20 +1,20 @@
 [Unit]
-Description=Pinscher Hardware Orchestration Layer
+Description=Pinscher Boot Hardware Check
 Documentation=https://github.com/eonicman/pinscher
 After=multi-user.target
 
 [Service]
 Type=oneshot
+# Run lint-boot and report, saving JSON output to /var/log/pinscher/
+ExecStartPre=/bin/mkdir -p /var/log/pinscher
 ExecStart=/usr/bin/pinscher lint-boot --json
 ExecStart=/usr/bin/pinscher report --json
-# Use StandardOutput=append to log to journal
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:/var/log/pinscher/boot-check.log
+StandardError=append:/var/log/pinscher/boot-check.log
 
 # Run as root to access all sysfs paths
-# For read-only operations (report, lint-boot, diagnose, get), no root needed
+# For read-only operations (report, lint-boot, diagnose, get), no special privileges needed beyond sysfs read
 # For write operations (set, apply), root is required
-#User=root
 
 [Install]
 WantedBy=multi-user.target

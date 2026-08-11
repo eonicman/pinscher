@@ -139,19 +139,24 @@ var Database = QuirkDatabase{
 	},
 }
 
-// FindByDevice returns quirks that match a given PCI vendor:device ID
+// FindByDevice returns quirks that match a given PCI vendor:device ID.
+// Also matches non-PCI device IDs (e.g. "nvme", "applesmc") when they
+// appear as device identifiers rather than module names.
 func FindByDevice(vendor, deviceID string) []Quirk {
 	id := vendor + ":" + deviceID
 	var matches []Quirk
 	for _, q := range Database.Quirks {
 		for _, did := range q.DeviceIDs {
-			if did == id || did == "nvme" || did == "applesmc" || did == "apple-gmux" {
-				// Handle non-PCI IDs (platform devices, generic module names)
-				if did == "nvme" || did == "applesmc" || did == "apple-gmux" {
-					// These match by module name, not device ID
-					continue
-				}
+			// PCI vendor:device ID match
+			if did == id {
 				matches = append(matches, q)
+				break
+			}
+			// Non-PCI device ID match (platform devices, module names)
+			// These match when the query ID equals the quirk's device ID directly
+			if did == deviceID && (did == "nvme" || did == "applesmc" || did == "apple-gmux") {
+				matches = append(matches, q)
+				break
 			}
 		}
 	}

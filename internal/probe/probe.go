@@ -733,7 +733,7 @@ func probeWiFiDetails() map[string]map[string]string {
 
 		var currentSection string
 		for _, line := range lines {
-				line = strings.TrimSpace(line)
+			line = strings.TrimSpace(line)
 
 			// Parse sections
 			if strings.HasPrefix(line, "Frequencies:") {

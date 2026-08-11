@@ -1,0 +1,23 @@
+#!/bin/bash
+# Pinscher mkinitcpio install hook
+# Adds pinscher lint-boot check after initramfs generation
+#
+# Install:
+#   1. Copy hooks/pinscher to /etc/initcpio/hooks/pinscher
+#   2. Copy this file to /etc/initcpio/install/pinscher
+#   3. Add 'pinscher' to the HOOKS array in /etc/mkinitcpio.conf
+#   4. Regenerate: sudo mkinitcpio -P
+
+build() {
+    # pinscher check runs after the image is built, not inside the image
+    # The hook script handles the post-build check
+    :
+}
+
+help() {
+    cat <<HELPEOF
+  pinscher: Run hardware boot lint after initramfs generation
+  This hook runs 'pinscher lint-boot' after the initramfs is built
+  to verify that all boot-critical drivers are present.
+HELPEOF
+}

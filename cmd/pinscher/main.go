@@ -21,6 +21,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Global flags that don't need a subcommand
+	switch os.Args[1] {
+	case "--version", "-V":
+		fmt.Printf("pinscher %s\n", version)
+		os.Exit(0)
+	}
+
 	switch os.Args[1] {
 	case "report":
 		cmdReport()
@@ -361,6 +368,7 @@ Commands:
   audit-log           Print the audit log of all config operations
 
   version             Print version
+  --version, -V       Print version and exit
   help                Show this help
 
 Bus Support:
@@ -385,5 +393,10 @@ Examples:
   pinscher audit-log
 
 Built by Ami — Systems Engineer, Built by Bots
+
+Options:
+  --version, -V       Print version and exit
+  --json, -j           Output as JSON (report, lint-boot, diagnose, quirks)
+  --dry-run            Preview changes without writing (set, apply)
 `, version)
 }
