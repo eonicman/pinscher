@@ -1,5 +1,52 @@
 # Pinscher Changelog
 
+## v0.6.0 — Watch Mode, Diff, Expanded Quirk Database
+
+### New: `pinscher watch` command
+
+Real-time hardware monitoring via udev events. Detects device add/remove/change
+as they happen. Falls back to polling if udevadm is unavailable.
+
+- `--json` for scripted consumption
+- `--quiet` to suppress continuous output
+- `--snapshot` to take a before/after probe snapshot
+- `--duration 30s` to stop after a time period
+- Events include device bus, vendor/device IDs, driver, and description
+
+### New: `pinscher diff` command
+
+Compare two hardware probe snapshots to find differences. Shows added, removed,
+and changed devices (e.g., driver changes).
+
+```bash
+pinscher report --json > before.json
+# make hardware changes
+pinscher diff before.json              # compare against current system
+pinscher diff before.json after.json    # compare two snapshots
+```
+
+### Expanded Quirk Database
+
+22 entries across 9 categories (was 7 entries, 3 categories):
+
+- **GPU**: AMD SI support, DC, reset method; NVIDIA DPM
+- **USB**: FL1100, ASMedia ASM1142
+- **Storage**: NVMe APST, Samsung 970 EVO+ firmware
+- **Audio**: Intel HDA model fixup, Realtek ALC892/897, Framework audio codec
+- **Network**: Realtek RTL8125 ASPM, Intel AX200/210 WiFi power save
+- **Power**: Framework S3 sleep, RPi4 USB-C
+- **Input**: ThinkPad TrackPoint, MacBook Pro TouchBar
+- **Thunderbolt**: ThinkPad T480s/T490, Dell XPS 13
+- **Apple**: SMC, gmux (existing, Mac Pro 6,1)
+
+### Other
+- Updated README with new commands and expanded quirk table
+- Added CONTRIBUTING.md
+- Tests updated for expanded quirk database
+- All 9 categories now represented in quirk database
+
+---
+
 ## v0.5.0 — Driver Synthesis Engine
 
 ### New: `pinscher synthesize` command

@@ -5,8 +5,7 @@ between the kernel and OS-level AI agents. It discovers hardware, diagnoses driv
 failures, and exposes a structured API for querying, configuring, and grouping
 subsystems by intent.
 
-**Status:** Phase 1–3 probe layer complete. See [CONCEPT.md](CONCEPT.md) for the full design
-and [docs/GHOST-NOTES.md](docs/GHOST-NOTES.md) for build-order and safety notes.
+**Status:** v0.6.0 — Phases 1–5 complete. Watch mode, diff, expanded quirk DB (22 entries, 9 categories), driver synthesis. See [CONCEPT.md](CONCEPT.md) for the full design.
 
 A [Built by Bots](https://github.com/eonicman) project.
 
@@ -101,7 +100,7 @@ pinscher list-params amdgpu
 
 ### `pinscher quirks`
 List known hardware quirks from the embedded database. Each quirk has provenance
-(citation URL) and severity.
+(citation URL), severity, and verified status.
 
 ```bash
 # All quirks
@@ -115,6 +114,62 @@ pinscher quirks 1002:6799
 
 # JSON output
 pinscher quirks --json
+```
+
+### `pinscher synthesize <device>`
+Driver synthesis engine — proposes driver solutions using a safety ladder.
+Rung 1 (safe): quirk/param/udev rules. Rung 2 (contained): userspace driver.
+Rung 3 (risky): patched in-tree driver. Rung 4 (last resort): novel module.
+Optionally queries Ollama for LLM-assisted synthesis.
+
+```bash
+# Rung 1 (default, safe)
+pinscher synthesize 1002:6799
+
+# Rung 2 (userspace driver proposals)
+pinscher synthesize 1002:6799 --rung 2
+
+# Skip LLM, database only
+pinscher synthesize 1002:6799 --model none
+
+# Use specific Ollama model
+pinscher synthesize 1002:6799 --model qwen3:8b
+```
+
+### `pinscher watch`
+Monitor hardware changes in real-time. Uses udevadm monitor for live events,
+falling back to polling if udev is unavailable.
+
+```bash
+# Start watching (Ctrl+C to stop)
+pinscher watch
+
+# With initial snapshot
+pinscher watch --snapshot
+
+# JSON output for scripting
+pinscher watch --json
+
+# Stop after 30 seconds
+pinscher watch --duration 30s
+```
+
+### `pinscher diff <file1> [file2]`
+Compare two probe snapshots. If only one file is given, compare against the
+current system. Shows added, removed, and changed devices.
+
+```bash
+# Create a snapshot
+pinscher report --json > before.json
+
+# Make hardware changes, then compare
+pinscher diff before.json
+
+# Compare two saved snapshots
+pinscher diff old-server.json new-server.json
+
+# JSON output
+pinscher diff before.json --json
 ```
 
 ### `pinscher apply <profile>`
@@ -213,17 +268,29 @@ Each device in JSON output includes:
 ## Quirk Database
 
 Pinscher ships with an embedded quirk database of known hardware issues and their
-fixes, each with provenance (citation URL). Current entries include:
+fixes, each with provenance (citation URL) and verified status. **22 entries across
+9 categories** covering Mac Pro, ThinkPad, Framework, Dell, NVIDIA, AMD, Raspberry Pi,
+and more.
 
-| Quirk ID | Severity | Module | Description |
-|----------|----------|--------|-------------|
-| `amdgpu-tahiti-xt-si-support` | fatal | amdgpu | Tahiti XT needs si_support=1 |
-| `amdgpu-tahiti-xt-dc` | warning | amdgpu | Tahiti XT needs dc=1 for display |
-| `fl1100-usb3-firmware` | info | xhci_hcd | FL1100 intermittent disconnects on Mac Pro |
-| `apple-smc-macpro61` | info | applesmc | Mac Pro 6,1 SMC sensor info |
-| `apple-gmux-macpro61` | info | apple-gmux | Mac Pro 6,1 GPU multiplexer |
-| `nvme-apst-disable` | warning | nvme | APST bugs on some SSDs |
-| `snd-hda-intel-model-fixup` | info | snd_hda_intel | Model param for codec detection |
+### Key Quirks by Severity
+
+| Severity | Module | Quirk | Description |
+|----------|--------|-------|-------------|
+| **Fatal** | amdgpu | tahiti-xt-si-support | Tahiti XT needs si_support=1 |
+| **Fatal** | nvme | samsung-970evo-plus-firmware | Samsung 970 EVO+ firmware bug causes I/O errors |
+| **Warning** | amdgpu | tahiti-xt-dc | Tahiti XT needs dc=1 for display |
+| **Warning** | thunderbolt | thinkpad-t480s-thunderbolt-power | T480s/T490 Thunderbolt firmware update needed |
+| **Warning** | thunderbolt | dell-xps-thunderbolt | Dell XPS 13 Thunderbolt firmware update |
+| **Warning** | iwlwifi | intel-ax210-power-save | Intel AX200/210 WiFi power save causes disconnects |
+| **Warning** | r8169 | realtek-rtl8125-aspm | RTL8125 2.5GbE ASPM causes link drops |
+| **Warning** | nvme | nvme-apst-disable | NVMe APST crashes on some SSDs |
+| **Info** | snd_hda_intel | Various audio codec fixups | Framework, Realtek, Intel HDA |
+| **Info** | xhci_hcd | FL1100/ASM1142 USB issues | USB controller quirks |
+| **Info** | applesmc, apple-gmux | Mac Pro 6,1 | Apple hardware quirks |
+| **Info** | power | framework-13-s3-sleep | Framework needs S3 sleep |
+| **Info** | power | rpi4-usb-c-power | RPi4 USB-C charger compatibility |
+
+Full list: `pinscher quirks` or `pinscher quirks --json`
 
 ## Safety Model
 
@@ -242,8 +309,10 @@ All operations are logged to the audit log.
 - **Phase 1** ✅ — Probe + Report + Lint-boot (hardware discovery, initramfs coverage check)
 - **Phase 2** ✅ — Diagnose + Quirk Database + Set/Get/Audit + Apply Profiles
 - **Phase 3** ✅ — Multi-bus probing (platform, ACPI, Bluetooth, WiFi) + capability extraction
-- **Phase 4** 🔜 — Driver synthesis / LLM integration for unknown hardware
-- **Phase 5** 🔜 — Dynamic subsystem grouping (intent-based orchestration)
+- **Phase 4** ✅ — Driver synthesis engine (safety ladder, LLM integration via Ollama)
+- **Phase 5** ✅ — Watch mode + Diff command (real-time hardware monitoring, snapshot comparison)
+- **Phase 6** 🔜 — JSON/YAML profiles (gaming, low-power, audio, VR presets)
+- **Phase 7** 🔜 — Dynamic subsystem grouping (intent-based orchestration)
 
 ## Origin Story
 
