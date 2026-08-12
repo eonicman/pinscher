@@ -13,6 +13,7 @@ import (
 	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/probe"
 	"github.com/eonicman/pinscher/internal/quirk"
+	"github.com/eonicman/pinscher/internal/submit"
 	"github.com/eonicman/pinscher/internal/synthesize"
 	"github.com/eonicman/pinscher/internal/watch"
 )
@@ -59,6 +60,8 @@ func main() {
 		cmdDiff()
 	case "profile":
 		cmdProfile()
+	case "quirk-submit":
+		cmdQuirkSubmit()
 	case "version":
 		fmt.Printf("pinscher %s\n", version)
 	case "help", "--help", "-h":
@@ -595,6 +598,39 @@ func printDiffHuman(host1, host2 string, events []watch.HardwareEvent) {
 	}
 }
 
+func cmdQuirkSubmit() {
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "Usage: pinscher quirk-submit <device> [--probe]")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Generate a GitHub issue template for submitting a new hardware quirk.")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "  <device>    PCI address, vendor:device ID, driver name, or description")
+		fmt.Fprintln(os.Stderr, "  --probe     Include full hardware probe data in the issue")
+		os.Exit(1)
+	}
+
+	deviceQuery := os.Args[2]
+	includeProbe := hasFlag("--probe", "-p")
+
+	title, body, err := submit.GenerateIssue(deviceQuery, includeProbe)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	jsonOutput := hasFlag("--json", "-j")
+	if jsonOutput {
+		data := map[string]string{
+			"title": title,
+			"body":  body,
+		}
+		out, _ := json.MarshalIndent(data, "", "  ")
+		fmt.Println(string(out))
+	} else {
+		fmt.Printf("Title: %s\n\n%s", title, body)
+	}
+}
+
 func cmdProfile() {
 	jsonOutput := hasFlag("--json", "-j")
 	dryRun := hasFlag("--dry-run")
@@ -821,6 +857,11 @@ Commands:
     [module|device]   Filter by module or vendor:device ID
     --json, -j        Output as JSON
 
+  quirk-submit <device>  Generate a GitHub issue template for a new quirk
+    <device>          PCI address, vendor:device ID, driver name, or description
+    --probe, -p       Include full hardware probe data
+    --json, -j        Output as JSON
+
   synthesize <device>  Synthesize driver solutions for a device
     <device>          PCI address, vendor:device ID, driver name, or description
     --rung N          Target synthesis rung 1-4 (default: 1)
@@ -885,6 +926,11 @@ Examples:
   pinscher watch --duration 30s
   pinscher diff before.json                  # compare against current system
   pinscher diff before.json after.json       # compare two snapshots
+  pinscher profile recommend
+  pinscher profile gaming --apply --dry-run
+  pinscher profile macpro61 --enrich --apply
+  pinscher quirk-submit amdgpu              # generate GitHub issue template
+  pinscher quirk-submit 1002:6799 --probe   # with full probe data
 
 Built by Ami — Systems Engineer, Built by Bots
 

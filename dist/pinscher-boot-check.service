@@ -5,10 +5,11 @@ After=multi-user.target
 
 [Service]
 Type=oneshot
-# Run lint-boot and report, saving JSON output to /var/log/pinscher/
+# Run lint-boot, report, profile recommendations, and quirk check
 ExecStartPre=/bin/mkdir -p /var/log/pinscher
 ExecStart=/usr/bin/pinscher lint-boot --json
 ExecStart=/usr/bin/pinscher report --json
+ExecStart=/usr/bin/pinscher profile recommend --json
 StandardOutput=append:/var/log/pinscher/boot-check.log
 StandardError=append:/var/log/pinscher/boot-check.log
 
