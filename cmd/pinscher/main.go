@@ -11,9 +11,10 @@ import (
 	"github.com/eonicman/pinscher/internal/lintboot"
 	"github.com/eonicman/pinscher/internal/probe"
 	"github.com/eonicman/pinscher/internal/quirk"
+	"github.com/eonicman/pinscher/internal/synthesize"
 )
 
-const version = "0.4.0"
+const version = "0.5.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -45,6 +46,8 @@ func main() {
 		cmdQuirks()
 	case "audit-log":
 		cmdAuditLog()
+	case "synthesize":
+		cmdSynthesize()
 	case "apply":
 		cmdApply()
 	case "version":
@@ -265,6 +268,127 @@ func cmdAuditLog() {
 	fmt.Print(config.PrintAuditLog())
 }
 
+func cmdSynthesize() {
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "Usage: pinscher synthesize <device> [options]")
+		fmt.Fprintln(os.Stderr, "  device can be: PCI address, vendor:device ID, driver name, or description")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Options:")
+		fmt.Fprintln(os.Stderr, "  --json, -j          Output as JSON")
+		fmt.Fprintln(os.Stderr, "  --rung N            Target synthesis rung (1-4, default: 1)")
+		fmt.Fprintln(os.Stderr, "  --model MODEL       Ollama model to use (default: qwen3:8b, 'none' to skip LLM)")
+		fmt.Fprintln(os.Stderr, "  --kernel-src PATH   Path to kernel source tree (for Rung 3+)")
+		fmt.Fprintln(os.Stderr, "  --dry-run           Don't apply any changes")
+		fmt.Fprintln(os.Stderr, "  --ollama-url URL    Ollama API URL (default: http://localhost:11434)")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Rungs:")
+		fmt.Fprintln(os.Stderr, "  1  Quirk/param/udev rules (safe, reversible)")
+		fmt.Fprintln(os.Stderr, "  2  Userspace driver (libusb/uio/vfio, contained)")
+		fmt.Fprintln(os.Stderr, "  3  Patched in-tree driver (risky, needs test partition)")
+		fmt.Fprintln(os.Stderr, "  4  Novel kernel module (last resort, sandbox only)")
+		os.Exit(1)
+	}
+
+	deviceQuery := os.Args[2]
+	jsonOutput := hasFlag("--json", "-j")
+	dryRun := hasFlag("--dry-run")
+
+	// Parse rung level
+	rung := synthesize.Rung1
+	for i, arg := range os.Args[3:] {
+		if arg == "--rung" && i+1 < len(os.Args[3:]) {
+			var r int
+			fmt.Sscanf(os.Args[4+i], "%d", &r)
+			if r >= 1 && r <= 4 {
+				rung = synthesize.SynthesisRung(r)
+			}
+		}
+	}
+
+	// Parse model
+	model := ""
+	for i, arg := range os.Args[3:] {
+		if arg == "--model" && i+1 < len(os.Args[3:]) {
+			model = os.Args[4+i]
+		}
+	}
+
+	// Parse kernel source path
+	kernelSrc := ""
+	for i, arg := range os.Args[3:] {
+		if arg == "--kernel-src" && i+1 < len(os.Args[3:]) {
+			kernelSrc = os.Args[4+i]
+		}
+	}
+
+	// Parse Ollama URL
+	ollamaURL := ""
+	for i, arg := range os.Args[3:] {
+		if arg == "--ollama-url" && i+1 < len(os.Args[3:]) {
+			ollamaURL = os.Args[4+i]
+		}
+	}
+
+	// Find the device via probe
+	probeResult, err := probe.Probe()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error probing hardware: %v\n", err)
+		os.Exit(1)
+	}
+
+	var device *probe.Device
+	for _, d := range probeResult.Devices {
+		// Match by various criteria
+		if d.Path == deviceQuery ||
+			strings.HasSuffix(d.Path, "/"+deviceQuery) ||
+			strings.EqualFold(d.Vendor+":"+d.DeviceID, deviceQuery) ||
+			(d.Description != "" && strings.Contains(strings.ToLower(d.Description), strings.ToLower(deviceQuery))) ||
+			d.Driver == deviceQuery {
+			device = &d
+			break
+		}
+	}
+
+	if device == nil {
+		fmt.Fprintf(os.Stderr, "Error: no device found matching '%s'\n", deviceQuery)
+		os.Exit(1)
+	}
+
+	// Set Ollama URL if provided
+	if ollamaURL != "" {
+		synthesize.OllamaURL = ollamaURL
+	}
+
+	// Run synthesis
+	req := synthesize.SynthesizeRequest{
+		Device:    *device,
+		Rung:      rung,
+		DryRun:    dryRun,
+		Model:     model,
+		KernelSrc: kernelSrc,
+	}
+
+	result, err := synthesize.Synthesize(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jsonOutput {
+		data, _ := result.JSON()
+		fmt.Println(data)
+	} else {
+		fmt.Print(result.PrintHuman())
+	}
+
+	// Exit with warning code if confidence is low
+	if result.Confidence == "experimental" || result.Confidence == "low" {
+		if !jsonOutput {
+			fmt.Println("\n⚠ Note: Low confidence result. Verify proposals before applying.")
+		}
+	}
+}
+
 func cmdApply() {
 	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, "Usage: pinscher apply <profile-file> [--dry-run]")
@@ -362,6 +486,15 @@ Commands:
     [module|device]   Filter by module or vendor:device ID
     --json, -j        Output as JSON
 
+  synthesize <device>  Synthesize driver solutions for a device
+    <device>          PCI address, vendor:device ID, driver name, or description
+    --rung N          Target synthesis rung 1-4 (default: 1)
+    --model MODEL     Ollama model to use (default: llama3.1)
+    --kernel-src PATH  Path to kernel source tree (for Rung 3+)
+    --ollama-url URL   Ollama API URL (default: http://localhost:11434)
+    --dry-run         Don't apply any changes
+    --json, -j        Output as JSON
+
   apply <profile>     Apply a settings profile (key=value per line)
     --dry-run         Show what would change without writing
 
@@ -385,6 +518,9 @@ Examples:
   pinscher diagnose 02:00.0
   pinscher diagnose 1002:6799
   pinscher diagnose amdgpu
+  pinscher synthesize 1002:6799
+  pinscher synthesize 1002:6799 --rung 2
+  pinscher synthesize "FirePro" --rung 3 --kernel-src /usr/src/linux
   pinscher get amdgpu si_support
   pinscher set amdgpu si_support 1
   pinscher set amdgpu dc 1 --dry-run

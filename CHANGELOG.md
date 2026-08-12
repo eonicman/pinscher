@@ -1,82 +1,131 @@
-# Changelog
+# Pinscher Changelog
 
-All notable changes to this project will be documented in this file.
+## v0.5.0 — Driver Synthesis Engine
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### New: `pinscher synthesize` command
 
-## [0.4.0] - 2026-08-09
+The flagship feature: Pinscher can now propose driver solutions for devices without
+drivers, using a safety ladder from safe to spicy:
 
-### Added
-- Platform bus probe (`/sys/bus/platform/devices/`) — Apple SMC, RTC, sensors
-- ACPI bus probe (`/sys/bus/acpi/devices/`) — power buttons, embedded controllers, thermal zones
-- Filters 316 generic `device:*` ACPI containers (590 → 274 devices on Mac Pro 6,1)
-- Bluetooth HCI probe (`/sys/class/bluetooth/`) — type, HCI/LMP version, features, manufacturer
-- Resolves Bluetooth vendor/product from USB parent via `filepath.EvalSymlinks`
-- WiFi PHY probe (`/sys/class/ieee80211/`) — MAC, HT/VHT, interface modes, cipher suites
-- WiFi detailed capabilities via `iw phy# info` (bands, modes, frequencies)
-- Resolves WiFi PCI parent for vendor/device IDs and description lookup
-- `Device.Capabilities` map for bus-specific key-value pairs
+- **Rung 1** (safe): Quirk/param/udev rule generation from embedded database + LLM reasoning
+- **Rung 2** (contained): Userspace driver proposals (libusb for USB, VFIO for PCI)
+- **Rung 3** (risky): Kernel source analysis — find similar drivers in the source tree
+- **Rung 4** (last resort): Novel kernel module synthesis (sandbox only)
+
+### How it works
+
+1. **Database lookup**: Checks embedded quirk database for known device issues
+   (amdgpu Tahiti XT quirks, etc.) — instant, verified, high confidence
+2. **Module resolution**: If a device has a modalias but no loaded driver, checks
+   `modprobe --resolve-alias` and proposes loading the correct module
+3. **LLM synthesis**: Queries Ollama (local LLM) with full device context for
+   proposals at the target rung level
+4. **Userspace driver proposals**: For USB/PCI devices, proposes libusb or VFIO
+   passthrough as safer alternatives to kernel modules
+5. **Kernel source search**: At Rung 3+, searches the kernel source tree for
+   vendor/device ID matches in existing drivers
+
+### Output
+
+Each proposal includes:
+- Type (quirk, module_param, udev_rule, userspace_driver, kernel_patch)
+- Safety rung (1-4)
+- Action description and shell commands
+- Config files to write (e.g., `/etc/modprobe.d/pinscher-amdgpu.conf`)
+- Rollback commands
+- Reasoning and citation URLs
+- Verification status
+
+### Usage
+
+```bash
+# Safe: database + modprobe + LLM (Rung 1)
+pinscher synthesize 1002:6799
+
+# Userspace driver proposals (Rung 2)
+pinscher synthesize 1002:6799 --rung 2
+
+# With kernel source analysis (Rung 3)
+pinscher synthesize 1002:6799 --rung 3 --kernel-src /usr/src/linux
+
+# Skip LLM (database + modprobe only, instant)
+pinscher synthesize 1002:6799 --model none
+
+# JSON output
+pinscher synthesize 1002:6799 --json
+
+# Dry run (no changes applied)
+pinscher synthesize 1002:6799 --dry-run
+```
+
+### Models
+
+- Default LLM: `qwen3:8b` (local via Ollama)
+- Use `--model none` to skip LLM and get database-only results
+- Use `--model phi3:mini` for faster but less accurate results
+- Use `--ollama-url` for custom Ollama endpoints
+
+---
+
+## v0.4.0 — Multi-Bus Probing
+
+### New bus probes
+- Platform: OF compatible strings, modalias, applesmc/macsmc devices
+- ACPI: HID/CID/UID/status extraction, filtered 316 `device:*` containers
+- Bluetooth: Full HCI/LMP capability extraction, resolves vendor/product from USB parent
+- WiFi: PCI parent resolution, HT/VHT flags, `iw phy# info` details
+
+### Other
 - PCI/USB class name lookups (40+ PCI classes, 20+ USB classes)
-- Platform/ACPI boot-critical checks in `lint-boot` (power button, SMC, embedded controller)
-- `probe_newbus_test.go` — tests for all new bus probes
+- Device.Capabilities map for bus-specific key-value pairs
+- lint-boot: platform/ACPI boot-critical checks
+- Bug fixes: Bluetooth vendor resolution, ACPI filtering
+- Tests: probe_newbus_test.go — all passing
 
-### Changed
-- Use `filepath.EvalSymlinks()` for Bluetooth USB parent resolution (fixes string-based symlink resolution)
-- WiFi MAC address preserved in `capabilities["mac_address"]` when replaced by PCI device ID
-- ACPI filtering skips `device:*` entries — they're generic containers, not real hardware
-- Platform/ACPI lint-boot uses modalias prefix matching (e.g. `acpi:PNP0C0C` → "input")
+---
 
-### Fixed
-- Bluetooth vendor resolution with `EvalSymlinks` vs `filepath.Join` for sysfs symlinks
-- WiFi PCI parent extraction handles multi-segment device link paths correctly
+## v0.3.0 — Diagnose, Quirk Database, Config
 
-## [0.3.0] - 2026-08-08
-
-### Added
-- PCI ID database lookup (`probe/pciids.go`) — lazy-loads `/usr/share/hwdata/pci.ids`
-- Human-readable device names for PCI devices (e.g. "Tahiti XT [Radeon HD 7970]" instead of "0x1002:0x6798")
-- `pinscher diagnose` — deep diagnosis of a single device by PCI address, vendor:device ID, driver name, or description substring
-- `pinscher quirks` — list known hardware quirks from embedded database
-- `pinscher get <module> <param>` — read kernel module parameters
-- `pinscher set <module> <param> <value>` — write module parameters with safety checks
+### New commands
+- `pinscher diagnose <device>` — deep diagnosis of a single device
+- `pinscher quirks [module|device]` — list known hardware quirks
+- `pinscher set <module> <param> <value>` — write module parameters
+- `pinscher get <module> <param>` — read module parameters
 - `pinscher list-params <module>` — list all parameters for a module
-- `pinscher apply <profile>` — apply settings from a key=value profile file
-- `pinscher audit-log` — view audit log of all config operations
-- Quirk database with provenance (7 entries: amdgpu Tahiti XT, FL1100, Apple SMC, gmux, NVMe APST, snd-hda-intel)
-- Tiered safety model: Safe / Warning / Blocked
-- Dry-run mode for `set` and `apply`
+- `pinscher apply <profile>` — apply a settings profile
+- `pinscher audit-log` — print audit log of config operations
+
+### Quirk database
+- Embedded quirk database with provenance (citations, kernel version ranges)
+- AMD FirePro D700 / Tahiti XT quirks (si_support=1, dc=1)
+- Fresco Logic FL1100 USB 3.0 firmware timing issue
+- Apple SMC and GMUX documentation entries
+
+### Diagnose engine
+- Modalias resolution (modprobe --resolve-alias)
+- Blacklist detection (finds which file blacklists a module)
+- Firmware missing detection
+- Quirk applicability checking (verifies params are set correctly)
+- dmesg error scanning for device-specific issues
+
+---
+
+## v0.2.0 — PCI ID Database, Packaging
+
+### New
+- Embedded PCI ID database (pci.ids) for human-readable device names
+- Vendor/device ID normalization and lookup
 - PKGBUILD for Arch Linux packaging
-- systemd service for boot-time lint checks
-- mkinitcpio hook for post-generation lint
+- systemd unit for pinscher daemon (future)
+- mkinitcpio hook for lint-boot integration
 
-### Changed
-- Vendor/device ID normalization: stripped `0x` prefix for consistent matching
-- Modalias multi-line bug fix: `resolveModalias` returns individual modules
-- Dedup in `lint-boot`: same module from two GPUs no longer shows duplicate warnings
-- Cleaned up stale root-level files from Phase 1
+---
 
-### Fixed
-- Modalias resolution returns individual modules instead of concatenated multi-line output
+## v0.1.0 — Initial Release
 
-## [0.2.0] - 2026-08-07
-
-### Added
-- Phase 2: diagnose, quirk database, set/get, audit log
-- Quirk database with citations and severity levels
-- Safety-tiered config writes (Safe, Warning, Blocked)
-- Profile application with key=value format
-
-## [0.1.0] - 2026-08-06
-
-### Added
-- Initial release: hardware probe + boot lint
-- `pinscher report` — probe PCI and USB devices
-- `pinscher lint-boot` — check initramfs coverage for boot-critical drivers
-- JSON output mode for all commands
-- Basic test coverage
-
-[0.4.0]: https://github.com/eonicman/pinscher/releases/tag/v0.4.0
-[0.3.0]: https://github.com/eonicman/pinscher/releases/tag/v0.3.0
-[0.2.0]: https://github.com/eonicman/pinscher/releases/tag/v0.2.0
-[0.1.0]: https://github.com/eonicman/pinscher/releases/tag/v0.1.0
+### New
+- `pinscher report` — probe all hardware (PCI + USB)
+- `pinscher lint-boot` — check initramfs covers all boot-critical drivers
+- Basic sysfs walking for PCI and USB buses
+- Human-readable and JSON output
+- Boot-critical device detection (storage, USB host, keyboard, GPU)
