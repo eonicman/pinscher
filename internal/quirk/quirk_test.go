@@ -39,13 +39,22 @@ func TestFindByModule(t *testing.T) {
 		t.Fatalf("expected at least 2 quirks for amdgpu, got %d", len(quirks))
 	}
 
-	// xhci_hcd should have the FL1100 quirk
+	// xhci_hcd should have the FL1100 quirk (and potentially others)
 	quirks = FindByModule("xhci_hcd")
-	if len(quirks) != 1 {
-		t.Fatalf("expected 1 quirk for xhci_hcd, got %d", len(quirks))
+	if len(quirks) < 1 {
+		t.Fatalf("expected at least 1 quirk for xhci_hcd, got %d", len(quirks))
 	}
-	if quirks[0].ID != "fl1100-usb3-firmware" {
-		t.Errorf("expected fl1100 quirk, got %s", quirks[0].ID)
+
+	// Verify the FL1100 quirk is present
+	foundFL1100 := false
+	for _, q := range quirks {
+		if q.ID == "fl1100-usb3-firmware" {
+			foundFL1100 = true
+			break
+		}
+	}
+	if !foundFL1100 {
+		t.Error("expected to find FL1100 quirk for xhci_hcd")
 	}
 }
 
@@ -58,8 +67,9 @@ func TestFindByDeviceNotFound(t *testing.T) {
 
 func TestFindAll(t *testing.T) {
 	all := FindAll()
-	if len(all) != 7 {
-		t.Errorf("expected 7 quirks in database, got %d", len(all))
+	minExpected := 20 // Expanded from original 7
+	if len(all) < minExpected {
+		t.Errorf("expected at least %d quirks in database, got %d", minExpected, len(all))
 	}
 }
 
@@ -76,5 +86,63 @@ func TestQuirkFields(t *testing.T) {
 	}
 	if q.Category == "" {
 		t.Error("expected non-empty Category")
+	}
+}
+
+func TestNewQuirks(t *testing.T) {
+	// Test ThinkPad quirk
+	quirks := FindByModule("psmouse")
+	if len(quirks) == 0 {
+		t.Error("expected psmouse quirks (ThinkPad trackpoint)")
+	}
+
+	// Test Framework audio quirk
+	quirks = FindByModule("snd_hda_intel")
+	if len(quirks) < 2 {
+		t.Errorf("expected at least 2 quirks for snd_hda_intel, got %d", len(quirks))
+	}
+
+	// Test NVIDIA quirk
+	quirks = FindByModule("nvidia")
+	if len(quirks) == 0 {
+		t.Error("expected nvidia quirks")
+	}
+
+	// Test iwlwifi quirk
+	quirks = FindByModule("iwlwifi")
+	if len(quirks) == 0 {
+		t.Error("expected iwlwifi quirks (Intel AX WiFi)")
+	}
+
+	// Test r8169 quirk
+	quirks = FindByModule("r8169")
+	if len(quirks) == 0 {
+		t.Error("expected r8169 quirks (Realtek RTL8125)")
+	}
+}
+
+func TestQuirkCategories(t *testing.T) {
+	categories := map[string]bool{
+		"gpu":         true,
+		"usb":         true,
+		"storage":     true,
+		"audio":       true,
+		"network":     true,
+		"apple":       true,
+		"power":       true,
+		"input":       true,
+		"thunderbolt": true,
+	}
+
+	all := FindAll()
+	foundCategories := make(map[string]int)
+	for _, q := range all {
+		foundCategories[q.Category]++
+	}
+
+	for cat := range categories {
+		if foundCategories[cat] == 0 {
+			t.Errorf("expected at least one quirk in category %s", cat)
+		}
 	}
 }

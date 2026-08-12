@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/eonicman/pinscher/internal/config"
 	"github.com/eonicman/pinscher/internal/diagnose"
@@ -12,9 +13,10 @@ import (
 	"github.com/eonicman/pinscher/internal/probe"
 	"github.com/eonicman/pinscher/internal/quirk"
 	"github.com/eonicman/pinscher/internal/synthesize"
+	"github.com/eonicman/pinscher/internal/watch"
 )
 
-const version = "0.5.0"
+const version = "0.6.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -50,6 +52,10 @@ func main() {
 		cmdSynthesize()
 	case "apply":
 		cmdApply()
+	case "watch":
+		cmdWatch()
+	case "diff":
+		cmdDiff()
 	case "version":
 		fmt.Printf("pinscher %s\n", version)
 	case "help", "--help", "-h":
@@ -418,6 +424,174 @@ func cmdApply() {
 	fmt.Printf("\n%d operations %s\n", len(ops), map[bool]string{true: "applied", false: "planned"}[!dryRun])
 }
 
+func cmdWatch() {
+	jsonOutput := hasFlag("--json", "-j")
+	quiet := hasFlag("--quiet", "-q")
+	snapshot := hasFlag("--snapshot", "-s")
+
+	// Parse duration
+	duration := 0 * time.Second
+	for i, arg := range os.Args[2:] {
+		if arg == "--duration" || arg == "-d" {
+			if i+1 < len(os.Args[2:]) {
+				d, err := time.ParseDuration(os.Args[3+i])
+				if err == nil {
+					duration = d
+				}
+			}
+		}
+	}
+
+	opts := watch.WatchOptions{
+		Duration:      duration,
+		JSON:          jsonOutput,
+		Quiet:         quiet,
+		SnapshotFirst: snapshot,
+	}
+
+	w := watch.NewWatcher(opts)
+	result, err := w.Watch()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if jsonOutput {
+		data, err := result.JSON()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(data)
+	} else {
+		fmt.Printf("\nWatch complete: %d events in %v\n", result.EventsSeen, result.EndTime.Sub(result.StartTime).Round(time.Second))
+	}
+}
+
+func cmdDiff() {
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "Usage: pinscher diff <snapshot1.json> <snapshot2.json>")
+		fmt.Fprintln(os.Stderr, "  Compare two probe snapshots and show differences")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Use 'pinscher report --json > snap.json' to create snapshots")
+		os.Exit(1)
+	}
+
+	file1 := os.Args[2]
+	var file2 string
+	if len(os.Args) >= 4 {
+		file2 = os.Args[3]
+	} else {
+		// If only one file given, compare against current system
+		file2 = ""
+	}
+
+	jsonOutput := hasFlag("--json", "-j")
+
+	// Load first snapshot
+	data1, err := os.ReadFile(file1)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file1, err)
+		os.Exit(1)
+	}
+
+	var snap1 probe.ProbeResult
+	if err := json.Unmarshal(data1, &snap1); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", file1, err)
+		os.Exit(1)
+	}
+
+	// Load second snapshot or probe current system
+	var snap2 probe.ProbeResult
+	if file2 != "" {
+		data2, err := os.ReadFile(file2)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file2, err)
+			os.Exit(1)
+		}
+		if err := json.Unmarshal(data2, &snap2); err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing %s: %v\n", file2, err)
+			os.Exit(1)
+		}
+	} else {
+		current, err := probe.Probe()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error probing current system: %v\n", err)
+			os.Exit(1)
+		}
+		snap2 = *current
+	}
+
+	// Diff the two snapshots
+	events := diffWatchDiffProbes(&snap1, &snap2)
+
+	if jsonOutput {
+		data, _ := json.MarshalIndent(events, "", "  ")
+		fmt.Println(string(data))
+	} else {
+		printDiffHuman(snap1.Hostname, snap2.Hostname, events)
+	}
+}
+
+// diffWatchDiffProbes is a package-level wrapper for watch.diffProbes
+func diffWatchDiffProbes(old, new *probe.ProbeResult) []watch.HardwareEvent {
+	return watch.DiffProbes(old, new)
+}
+
+// printDiffHuman shows the diff in human-readable format
+func printDiffHuman(host1, host2 string, events []watch.HardwareEvent) {
+	if len(events) == 0 {
+		fmt.Printf("No differences between %s and %s\n", host1, host2)
+		return
+	}
+
+	fmt.Printf("Differences between %s and %s (%d):\n\n", host1, host2, len(events))
+
+	added := 0
+	removed := 0
+	changed := 0
+	for _, evt := range events {
+		switch evt.Type {
+		case watch.EventAdd:
+			added++
+		case watch.EventRemove:
+			removed++
+		case watch.EventChange:
+			changed++
+		}
+	}
+
+	if added > 0 {
+		fmt.Printf("Added (%d):\n", added)
+		for _, evt := range events {
+			if evt.Type == watch.EventAdd {
+				fmt.Printf("  ⊕ %s\n", evt.Message)
+			}
+		}
+		fmt.Println()
+	}
+
+	if removed > 0 {
+		fmt.Printf("Removed (%d):\n", removed)
+		for _, evt := range events {
+			if evt.Type == watch.EventRemove {
+				fmt.Printf("  ⊖ %s\n", evt.Message)
+			}
+		}
+		fmt.Println()
+	}
+
+	if changed > 0 {
+		fmt.Printf("Changed (%d):\n", changed)
+		for _, evt := range events {
+			if evt.Type == watch.EventChange {
+				fmt.Printf("  ⟳ %s\n", evt.Message)
+			}
+		}
+		fmt.Println()
+	}
+}
+
 func hasFlag(flags ...string) bool {
 	for _, arg := range os.Args[2:] {
 		for _, flag := range flags {
@@ -500,6 +674,17 @@ Commands:
 
   audit-log           Print the audit log of all config operations
 
+  watch               Monitor hardware changes in real-time (udev events)
+                      Detects device add/remove/driver-change events
+    --json, -j        Output events as JSON
+    --quiet, -q       Suppress continuous output
+    --snapshot, -s    Take probe snapshot before watching
+    --duration DUR    Stop after duration (e.g. 30s, 5m)
+
+  diff <file1> [file2]    Compare two probe snapshots
+                      If only one file given, compare against current system
+    --json, -j        Output as JSON
+
   version             Print version
   --version, -V       Print version and exit
   help                Show this help
@@ -527,6 +712,10 @@ Examples:
   pinscher quirks amdgpu
   pinscher apply /etc/pinscher/annie.profile
   pinscher audit-log
+  pinscher report --json > before.json
+  pinscher watch --duration 30s
+  pinscher diff before.json                  # compare against current system
+  pinscher diff before.json after.json       # compare two snapshots
 
 Built by Ami — Systems Engineer, Built by Bots
 
