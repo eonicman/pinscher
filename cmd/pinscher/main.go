@@ -10,13 +10,14 @@ import (
 	"github.com/eonicman/pinscher/internal/config"
 	"github.com/eonicman/pinscher/internal/diagnose"
 	"github.com/eonicman/pinscher/internal/lintboot"
+	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/probe"
 	"github.com/eonicman/pinscher/internal/quirk"
 	"github.com/eonicman/pinscher/internal/synthesize"
 	"github.com/eonicman/pinscher/internal/watch"
 )
 
-const version = "0.6.0"
+const version = "0.7.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -56,6 +57,8 @@ func main() {
 		cmdWatch()
 	case "diff":
 		cmdDiff()
+	case "profile":
+		cmdProfile()
 	case "version":
 		fmt.Printf("pinscher %s\n", version)
 	case "help", "--help", "-h":
@@ -592,6 +595,164 @@ func printDiffHuman(host1, host2 string, events []watch.HardwareEvent) {
 	}
 }
 
+func cmdProfile() {
+	jsonOutput := hasFlag("--json", "-j")
+	dryRun := hasFlag("--dry-run")
+	enrich := hasFlag("--enrich", "-e")
+
+	if len(os.Args) < 3 {
+		// List available profiles
+		names := profile.ListProfiles()
+		if jsonOutput {
+			data, _ := json.MarshalIndent(names, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Println("Available profiles:")
+			for _, name := range names {
+				p, _ := profile.LoadProfile(name)
+				if p != nil {
+					fmt.Printf("  %-20s %s\n", name, p.Description)
+				}
+			}
+			fmt.Println()
+			fmt.Println("Usage:")
+			fmt.Println("  pinscher profile <name>           Show profile details")
+			fmt.Println("  pinscher profile <name> --apply     Apply profile settings")
+			fmt.Println("  pinscher profile <name> --enrich    Enrich with hardware-specific quirks")
+			fmt.Println("  pinscher profile recommend           Recommend profiles for current hardware")
+			fmt.Println("  pinscher profile <file.json>         Load profile from file")
+		}
+		return
+	}
+
+	subcmd := os.Args[2]
+
+	// Handle subcommands
+	switch subcmd {
+	case "recommend", "rec":
+		cmdProfileRecommend(jsonOutput, dryRun, enrich)
+		return
+	}
+
+	// Load the profile
+	p, err := profile.LoadProfile(subcmd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Enrich with hardware quirks if requested
+	if enrich {
+		probeResult, err := probe.Probe()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: probe failed, skipping enrichment: %v\n", err)
+		} else {
+			p = profile.EnrichProfileFromQuirks(p, probeResult)
+		}
+	}
+
+	// Check for --apply flag
+	apply := hasFlag("--apply", "-a")
+	if apply {
+		result, err := profile.ApplyProfile(p, dryRun)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		if jsonOutput {
+			data, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			printProfileApplyResult(result, p, dryRun)
+		}
+	} else {
+		// Just show the profile
+		if jsonOutput {
+			data, err := p.JSON()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+		}
+			fmt.Println(data)
+		} else {
+			fmt.Print(profile.PrintProfileHuman(p))
+		}
+	}
+}
+
+func cmdProfileRecommend(jsonOutput, dryRun, enrich bool) {
+	probeResult, err := probe.Probe()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: probe failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	recommended := profile.RecommendProfiles(probeResult)
+
+	if jsonOutput {
+		var profiles []string
+		for _, p := range recommended {
+			profiles = append(profiles, p.Name)
+		}
+		data, _ := json.MarshalIndent(profiles, "", "  ")
+		fmt.Println(string(data))
+	} else {
+		if len(recommended) == 0 {
+			fmt.Println("No profiles recommended for your hardware.")
+			return
+		}
+
+		fmt.Printf("Recommended profiles for %s:\n\n", probeResult.Hostname)
+		for _, p := range recommended {
+			fmt.Printf("  %-20s %s\n", p.Name, p.Description)
+			fmt.Printf("  %-20s %d settings\n\n", "", len(p.Settings))
+		}
+
+		fmt.Println("Apply with: pinscher profile <name> --apply")
+		fmt.Println("Preview with: pinscher profile <name> --apply --dry-run")
+	}
+}
+
+func printProfileApplyResult(result *profile.ApplyResult, p *profile.Profile, dryRun bool) {
+	dry := ""
+	if dryRun {
+		dry = " (DRY RUN)"
+	}
+	fmt.Printf("Profile: %s%s\n\n", p.Name, dry)
+
+	if len(result.Applied) > 0 {
+		fmt.Printf("Applied (%d):\n", len(result.Applied))
+		for _, op := range result.Applied {
+			status := "✓"
+			if !op.Success {
+				status = "✗"
+			}
+			fmt.Printf("  %s %s.%s: %s → %s\n", status, op.Module, op.Param, op.OldValue, op.NewValue)
+			if op.Error != "" {
+				fmt.Printf("    Note: %s\n", op.Error)
+			}
+		}
+		fmt.Println()
+	}
+
+	if len(result.Skipped) > 0 {
+		fmt.Printf("Skipped (%d):\n", len(result.Skipped))
+		for _, s := range result.Skipped {
+			fmt.Printf("  ⊘ %s.%s = %s\n", s.Setting.Module, s.Setting.Param, s.Setting.Value)
+			fmt.Printf("    Reason: %s\n", s.Reason)
+		}
+		fmt.Println()
+	}
+
+	if len(result.Errors) > 0 {
+		fmt.Printf("Errors (%d):\n", len(result.Errors))
+		for _, e := range result.Errors {
+			fmt.Printf("  ✗ %s\n", e)
+		}
+	}
+}
+
 func hasFlag(flags ...string) bool {
 	for _, arg := range os.Args[2:] {
 		for _, flag := range flags {
@@ -671,6 +832,14 @@ Commands:
 
   apply <profile>     Apply a settings profile (key=value per line)
     --dry-run         Show what would change without writing
+
+  profile             List available hardware profiles
+    [name]            Show profile details
+    --apply, -a       Apply the profile
+    --dry-run         Preview changes without writing
+    --enrich, -e      Enrich profile with hardware-specific quirks
+    --json, -j        Output as JSON
+    recommend          Recommend profiles for current hardware
 
   audit-log           Print the audit log of all config operations
 
