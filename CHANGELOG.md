@@ -1,5 +1,43 @@
 # Pinscher Changelog
 
+## v0.8.0 — Quirk Submission, Boot Service Profile Recommendations
+
+### New: `pinscher quirk-submit` command
+
+Generates a ready-to-file GitHub issue template for a new quirk — device info,
+existing quirks for context, and a proposed quirk entry.
+
+- `--probe` for full hardware data in the template
+- `--json` for programmatic use
+
+### Boot service now runs profile recommendations
+
+`pinscher-boot-check.service` runs `profile recommend` after `lint-boot` and
+`report`, so a profile suggestion shows up automatically on boot alongside
+the existing checks.
+
+### Other
+- Full usage docs for `watch`, `diff`, `profile`, and `quirk-submit`
+- Examples section updated with all current command variants
+
+---
+
+## v0.7.0 — Hardware Profiles
+
+### New: `pinscher profile` command
+
+`list` / `show` / `apply` / `recommend` hardware settings profiles.
+
+- 6 built-in profiles: gaming, low-power, audio-production, vr, server, macpro61
+- Auto-recommendation based on detected hardware (driver, vendor/device ID, class, bus)
+- Quirk-database enrichment via `--enrich`, merging quirk entries into profile settings
+- Conflict detection (e.g. gaming conflicts with low-power)
+- Blocked params are skipped with an explanation rather than silently applied
+- Custom JSON profile files, plus legacy key=value files for backward compat
+- `--dry-run` support, JSON output for all subcommands
+
+---
+
 ## v0.6.0 — Watch Mode, Diff, Expanded Quirk Database
 
 ### New: `pinscher watch` command

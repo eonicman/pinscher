@@ -1,6 +1,7 @@
 # Binaries
-pinscher
 /pinscher
+pinscher-linux-*
+pinscher-darwin-*
 *.exe
 *.exe~
 *.dll
