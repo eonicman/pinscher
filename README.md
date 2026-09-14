@@ -5,7 +5,7 @@ between the kernel and OS-level AI agents. It discovers hardware, diagnoses driv
 failures, and exposes a structured API for querying, configuring, and grouping
 subsystems by intent.
 
-**Status:** v0.6.0 — Phases 1–5 complete. Watch mode, diff, expanded quirk DB (22 entries, 9 categories), driver synthesis. See [CONCEPT.md](CONCEPT.md) for the full design.
+**Status:** v0.9.0 — Phases 1–5 complete, plus the profile system (v0.7.0), quirk-submit (v0.8.0), and the `serve` daemon: a persistent hardware intelligence layer exposing the JSON API over a local Unix socket. Watch mode, diff, expanded quirk DB (22 entries, 9 categories), driver synthesis. See [CONCEPT.md](CONCEPT.md) for the full design.
 
 A [Built by Bots](https://github.com/eonicman) project.
 
@@ -193,6 +193,68 @@ sudo pinscher apply /etc/pinscher/annie.profile
 ### `pinscher audit-log`
 Print the audit log of all config operations (set, apply) performed this session.
 
+### `pinscher serve`
+Run Pinscher as a persistent daemon — the hardware intelligence layer from
+CONCEPT.md. Exposes the same structured data as the CLI over a local Unix
+socket using newline-delimited JSON, so agents and scripts can query live
+hardware state without paying a cold process start per query.
+
+Read-only methods: `ping`, `version`, `report`, `lint-boot`, `diagnose`,
+`quirks`, `profile`, `profiles`, `recommend`, `list-params`, `get`,
+`audit-log`. Mutating method: `set` — only available when started with
+`--allow-write`, and the socket is always created with 0600 permissions
+(owner only).
+
+```bash
+# Read-only daemon on the default socket
+pinscher serve
+
+# Custom socket, quiet
+pinscher serve --socket=/tmp/pinscher.sock -q
+
+# Enable the mutating "set" method (socket is 0600 — owner only)
+sudo pinscher serve --allow-write
+
+# One-shot query from the shell
+echo '{"id":1,"method":"report"}' | socat - UNIX-CONNECT:/run/pinscher.sock
+```
+
+Wire protocol:
+
+```
+→ {"id":1,"method":"diagnose","params":{"device":"amdgpu"}}
+← {"id":1,"ok":true,"result":{"status":"ok","checks":null,...}}
+← {"id":2,"ok":false,"error":"unknown method: frobnicate (supported: ping, version, ...)"}
+```
+
+Python client (10 lines, no dependencies):
+
+```python
+import socket, json
+
+def pinscher(method, **params):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect("/run/pinscher.sock")
+    f = s.makefile("r")
+    s.sendall((json.dumps({"id": 1, "method": method, "params": params}) + "\n").encode())
+    resp = json.loads(f.readline())
+    s.close()
+    if not resp["ok"]:
+        raise RuntimeError(resp["error"])
+    return resp["result"]
+
+report = pinscher("report")
+quirks = pinscher("quirks", device="1002:6799")
+```
+
+Behavior notes:
+
+- Responses are byte-identical to the equivalent `--json` CLI output.
+- Numeric params keep their exact source text (`120000` never becomes `1.2e+05`).
+- Empty lists may serialize as `null` — treat `null` as `[]` (same as CLI JSON).
+- A stale socket file from an unclean shutdown is reclaimed automatically;
+  starting a second live instance on the same socket is refused.
+
 ### `pinscher version`
 Print the version. Also available as `pinscher --version` or `pinscher -V`.
 
@@ -311,8 +373,9 @@ All operations are logged to the audit log.
 - **Phase 3** ✅ — Multi-bus probing (platform, ACPI, Bluetooth, WiFi) + capability extraction
 - **Phase 4** ✅ — Driver synthesis engine (safety ladder, LLM integration via Ollama)
 - **Phase 5** ✅ — Watch mode + Diff command (real-time hardware monitoring, snapshot comparison)
-- **Phase 6** 🔜 — JSON/YAML profiles (gaming, low-power, audio, VR presets)
-- **Phase 7** 🔜 — Dynamic subsystem grouping (intent-based orchestration)
+- **Phase 6** ✅ — Profile system (v0.7.0): built-in presets, hardware-matched recommendation, quirk enrichment
+- **Phase 7** ✅ — Serve daemon (v0.9.0): persistent Unix-socket JSON API — the hardware intelligence layer
+- **Phase 8** 🔜 — Dynamic subsystem grouping (intent-based orchestration)
 
 ## Origin Story
 

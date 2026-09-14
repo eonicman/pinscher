@@ -1,5 +1,89 @@
 # Pinscher Changelog
 
+## v0.9.0 — Serve Daemon (Persistent Hardware Intelligence Layer)
+
+### New: `pinscher serve`
+
+The CONCEPT.md Phase 1 spec — "exposes via local Unix socket" — is now real.
+`pinscher serve` runs a long-lived daemon exposing the hardware API over a
+local Unix socket using newline-delimited JSON, so AI agents and scripts can
+query live hardware state without a cold process start per query.
+
+- **Read-only methods:** `ping`, `version`, `report`, `lint-boot`, `diagnose`,
+  `quirks`, `profile`, `profiles`, `recommend`, `list-params`, `get`, `audit-log`
+- **Mutating method:** `set` — gated behind `--allow-write`; respects the same
+  safety ladder as the CLI (unknown params blocked, audit log always written)
+- **Socket hygiene:** created with 0600 permissions; stale socket files from
+  unclean shutdowns are reclaimed automatically; a second live instance on
+  the same socket is refused
+- **Protocol details:** request IDs echoed verbatim (any JSON value); numeric
+  params keep exact source text (`120000` never decays to `1.2e+05`, thanks to
+  `json.Number` decoding); panics are converted to error responses so one bad
+  request can't kill the daemon; unknown-method errors advertise the supported
+  method list so agent clients can self-correct
+- **Flags:** `--socket PATH`, `--allow-write`, `--duration DUR` (auto-stop,
+  for tests), `--quiet`
+- Responses are byte-identical to the equivalent `--json` CLI output
+  (verified: `lint-boot` over socket == CLI JSON on real hardware)
+
+### Fixed
+
+- `pinscher --version` reported 0.7.0 after v0.8.0 shipped — version const now
+  correctly bumped per release
+- README status line was stale (said v0.6.0)
+
+### Added
+
+- Backfilled CHANGELOG entries for v0.7.0 and v0.8.0 (were committed without
+  changelog sections)
+- 19 unit tests for the serve package: protocol framing, method dispatch,
+  safety gating, numeric fidelity, stale-socket recovery, concurrent clients,
+  multi-request connections
+
+---
+
+## v0.8.0 — quirk-submit, profile recommend in boot service, usage docs
+
+### New: `pinscher quirk-submit`
+
+Generate a GitHub issue template for reporting a new hardware quirk:
+
+- Includes device info, existing quirks, and a proposed quirk template
+- `--probe` flag embeds full hardware probe data for reproduction
+- `--json` output for programmatic use
+
+### Other
+
+- Updated systemd boot-check service (`dist/pinscher-boot-check.service`) to
+  run profile recommendations after lint-boot + report
+- Full usage docs for watch, diff, profile, and quirk-submit; examples section
+  covers all command variants
+
+---
+
+## v0.7.0 — Profile System, Hardware Presets, Profile Recommendation
+
+### New: `pinscher profile`
+
+List, show, apply, and recommend hardware profiles:
+
+- **6 built-in profiles:** gaming, low-power, audio-production, vr, server,
+  macpro61
+- **Profile enrichment:** merge quirk database entries into profile settings
+  (`--enrich`)
+- **Profile recommendation:** auto-suggest profiles based on detected hardware
+  (`pinscher profile recommend`)
+- **Hardware match criteria:** driver, vendor_id, device_id, class, bus
+- **Profile conflicts:** gaming conflicts with low-power, etc.
+- **Safety model:** blocked params skipped with explanation
+- **JSON output** for all profile commands; **dry-run** support for apply
+
+Profile system supports built-in named profiles, custom JSON profile files,
+legacy key=value profile files (backward compat), quirk enrichment, and
+auto-recommendation.
+
+---
+
 ## v0.6.0 — Watch Mode, Diff, Expanded Quirk Database
 
 ### New: `pinscher watch` command

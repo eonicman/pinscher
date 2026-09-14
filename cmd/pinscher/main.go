@@ -13,12 +13,13 @@ import (
 	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/probe"
 	"github.com/eonicman/pinscher/internal/quirk"
+	"github.com/eonicman/pinscher/internal/serve"
 	"github.com/eonicman/pinscher/internal/submit"
 	"github.com/eonicman/pinscher/internal/synthesize"
 	"github.com/eonicman/pinscher/internal/watch"
 )
 
-const version = "0.7.0"
+const version = "0.9.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -62,6 +63,8 @@ func main() {
 		cmdProfile()
 	case "quirk-submit":
 		cmdQuirkSubmit()
+	case "serve":
+		cmdServe()
 	case "version":
 		fmt.Printf("pinscher %s\n", version)
 	case "help", "--help", "-h":
@@ -827,6 +830,58 @@ func printQuirksHuman(quirks []quirk.Quirk) {
 	}
 }
 
+func cmdServe() {
+	socketPath := ""
+	allowWrite := false
+	quiet := false
+	duration := time.Duration(0)
+
+	args := os.Args[2:]
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--allow-write":
+			allowWrite = true
+		case arg == "--quiet" || arg == "-q":
+			quiet = true
+		case arg == "--socket":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: --socket requires a path")
+				os.Exit(1)
+			}
+			i++
+			socketPath = args[i]
+		case strings.HasPrefix(arg, "--socket="):
+			socketPath = strings.TrimPrefix(arg, "--socket=")
+		case arg == "--duration":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: --duration requires a value (e.g. 30s)")
+				os.Exit(1)
+			}
+			i++
+			arg = args[i]
+			fallthrough
+		case strings.HasPrefix(arg, "--duration="):
+			val := strings.TrimPrefix(arg, "--duration=")
+			d, err := time.ParseDuration(val)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: invalid --duration %q: %v\n", val, err)
+				os.Exit(1)
+			}
+			duration = d
+		default:
+			fmt.Fprintf(os.Stderr, "Error: unknown flag %q (serve supports --socket PATH, --allow-write, --duration DUR, --quiet)\n", arg)
+			os.Exit(1)
+		}
+	}
+
+	serve.Version = version
+	if err := serve.Run(socketPath, allowWrite, duration, quiet); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func printUsage() {
 	fmt.Printf(`Pinscher %s — Hardware Orchestration Layer
 
@@ -882,6 +937,19 @@ Commands:
     --json, -j        Output as JSON
     recommend          Recommend profiles for current hardware
 
+  serve               Run as a persistent daemon — the hardware
+                      intelligence layer. Exposes a JSON API over a local
+                      Unix socket (newline-delimited JSON requests/responses).
+                      Read-only methods: ping, version, report, lint-boot,
+                      diagnose, quirks, profile, profiles, recommend,
+                      list-params, get, audit-log. Mutating method: set
+                      (only with --allow-write; socket is 0600).
+    --socket PATH     Socket path (default: /run/pinscher.sock as root,
+                      else $XDG_RUNTIME_DIR/pinscher.sock)
+    --allow-write     Enable the mutating "set" method
+    --duration DUR    Auto-stop after duration (e.g. 30s) — useful for tests
+    --quiet, -q       Don't print the listening banner
+
   audit-log           Print the audit log of all config operations
 
   watch               Monitor hardware changes in real-time (udev events)
@@ -931,6 +999,11 @@ Examples:
   pinscher profile macpro61 --enrich --apply
   pinscher quirk-submit amdgpu              # generate GitHub issue template
   pinscher quirk-submit 1002:6799 --probe   # with full probe data
+  pinscher serve                            # persistent daemon (read-only)
+  pinscher serve --socket=/tmp/p.sock -q    # custom socket, quiet
+  pinscher serve --allow-write              # enable "set" mutations
+  echo '{"id":1,"method":"report"}' | \
+    socat - UNIX-CONNECT:/run/pinscher.sock # one-shot socket query
 
 Built by Ami — Systems Engineer, Built by Bots
 
