@@ -1,5 +1,82 @@
 # Pinscher Changelog
 
+## v0.9.1 — Serve Daemon + diff can fail
+
+Merged divergent lines: Annie's v0.9.0 serve daemon + Ghost's v0.8.1
+`diff --fail-on-change` — both shipped separately from forks of v0.8.0;
+combined here without losing either narrative.
+
+## v0.8.1 — `diff` can actually fail
+
+### New: `pinscher diff --fail-on-change`
+
+`diff` previously always exited 0, even when it found real differences —
+discovered while writing the fleet/enterprise docs (a passthrough-regression
+check assumed `diff` could gate a reboot via `&&`/`||`; it couldn't, no
+matter what flags existed). `--fail-on-change` exits 1 if any differences are
+found; default behavior (always exit 0) is unchanged so existing scripts
+aren't surprised by this release.
+
+```bash
+pinscher diff before.json after.json --fail-on-change || echo "something changed"
+```
+
+*Added by Ghost, 2026-10-17, while Peter was away — verified live (forced a
+driver-field diff between two real snapshots, confirmed exit 0→1 only with
+the flag present, confirmed default path still exits 0). Ami: flag it if
+this should be the default instead of opt-in.*
+
+---
+
+## v0.8.0 — Quirk Submission, Boot Service Profile Recommendations
+
+### New: `pinscher quirk-submit` command
+
+Generates a ready-to-file GitHub issue template for a new quirk — device info,
+existing quirks for context, and a proposed quirk entry.
+
+- `--probe` for full hardware data in the template
+- `--json` for programmatic use
+
+### Boot service now runs profile recommendations
+
+`pinscher-boot-check.service` runs `profile recommend` after `lint-boot` and
+`report`, so a profile suggestion shows up automatically on boot alongside
+the existing checks.
+
+### Other
+- Full usage docs for `watch`, `diff`, `profile`, and `quirk-submit`
+- Examples section updated with all current command variants
+
+---
+
+## v0.7.0 — Hardware Profiles
+
+### New: `pinscher profile` command
+
+`list` / `show` / `apply` / `recommend` hardware settings profiles.
+
+- 6 built-in profiles: gaming, low-power, audio-production, vr, server, macpro61
+- Auto-recommendation based on detected hardware (driver, vendor/device ID, class, bus)
+- Quirk-database enrichment via `--enrich`, merging quirk entries into profile settings
+- Conflict detection (e.g. gaming conflicts with low-power)
+- Blocked params are skipped with an explanation rather than silently applied
+- Custom JSON profile files, plus legacy key=value files for backward compat
+- `--dry-run` support, JSON output for all subcommands
+>>>>>>> ghost-sync
+### From v0.8.1 (Ghost)
+
+### New: `pinscher diff --fail-on-change`
+
+`diff` previously always exited 0, even when it found real differences —
+discovered while writing the fleet/enterprise docs (a passthrough-regression
+check assumed `diff` could gate a reboot via `&&`/`||`; it couldn't, no
+matter what flags existed). `--fail-on-change` exits 1 if any differences are
+found; default behavior (always exit 0) is unchanged so existing scripts
+aren't surprised by this release.
+
+
+### From v0.9.0 (Annie) — Serve Daemon
 ## v0.9.0 — Serve Daemon (Persistent Hardware Intelligence Layer)
 
 ### New: `pinscher serve`

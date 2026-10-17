@@ -19,7 +19,7 @@ import (
 	"github.com/eonicman/pinscher/internal/watch"
 )
 
-const version = "0.9.0"
+const version = "0.9.1"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -540,6 +540,18 @@ func cmdDiff() {
 	} else {
 		printDiffHuman(snap1.Hostname, snap2.Hostname, events)
 	}
+
+	// --fail-on-change (Ghost, 2026-10-17): diff previously always exited 0,
+	// even when it found real differences, so it couldn't drive a shell
+	// &&/|| regression gate — found while writing the fleet/enterprise docs
+	// (kvm-passthrough-validation.md's update-day regression check assumed
+	// a --fail-on flag could do this; the real gap was the exit code, not
+	// the flag name). Opt-in rather than changing the default, so any
+	// existing script relying on diff always exiting 0 isn't surprised by
+	// this release. Ami: flag it if you'd rather this be the default.
+	if hasFlag("--fail-on-change") && len(events) > 0 {
+		os.Exit(1)
+	}
 }
 
 // diffWatchDiffProbes is a package-level wrapper for watch.diffProbes
@@ -962,6 +974,7 @@ Commands:
   diff <file1> [file2]    Compare two probe snapshots
                       If only one file given, compare against current system
     --json, -j        Output as JSON
+    --fail-on-change  Exit 1 if any differences are found (default: always exits 0)
 
   version             Print version
   --version, -V       Print version and exit
@@ -994,6 +1007,7 @@ Examples:
   pinscher watch --duration 30s
   pinscher diff before.json                  # compare against current system
   pinscher diff before.json after.json       # compare two snapshots
+  pinscher diff before.json after.json --fail-on-change || echo "something changed"
   pinscher profile recommend
   pinscher profile gaming --apply --dry-run
   pinscher profile macpro61 --enrich --apply
