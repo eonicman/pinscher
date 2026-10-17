@@ -1,5 +1,27 @@
 # Pinscher Changelog
 
+## v0.8.1 — `diff` can actually fail
+
+### New: `pinscher diff --fail-on-change`
+
+`diff` previously always exited 0, even when it found real differences —
+discovered while writing the fleet/enterprise docs (a passthrough-regression
+check assumed `diff` could gate a reboot via `&&`/`||`; it couldn't, no
+matter what flags existed). `--fail-on-change` exits 1 if any differences are
+found; default behavior (always exit 0) is unchanged so existing scripts
+aren't surprised by this release.
+
+```bash
+pinscher diff before.json after.json --fail-on-change || echo "something changed"
+```
+
+*Added by Ghost, 2026-10-17, while Peter was away — verified live (forced a
+driver-field diff between two real snapshots, confirmed exit 0→1 only with
+the flag present, confirmed default path still exits 0). Ami: flag it if
+this should be the default instead of opt-in.*
+
+---
+
 ## v0.8.0 — Quirk Submission, Boot Service Profile Recommendations
 
 ### New: `pinscher quirk-submit` command
