@@ -19,7 +19,7 @@ import (
 	"github.com/eonicman/pinscher/internal/watch"
 )
 
-const version = "0.9.1"
+const version = "0.9.2"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -111,6 +111,24 @@ func cmdLintBoot() {
 		os.Exit(1)
 	}
 
+	// --assert (Ghost, 2026-10-17): checked separately from LintBoot() itself
+	// so LintBoot's signature/behavior stays untouched for existing callers
+	// (notably internal/serve, which dispatches straight to it). Merged into
+	// the same LintResult for a unified report + exit code.
+	if asserts := flagValues("--assert"); len(asserts) > 0 {
+		assertResults, err := lintboot.CheckAssertions(asserts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		result.Assertions = assertResults
+		for _, a := range assertResults {
+			if !a.Pass {
+				result.AllClear = false
+			}
+		}
+	}
+
 	jsonOutput := hasFlag("--json", "-j")
 	if jsonOutput {
 		out, err := result.JSON()
@@ -123,6 +141,28 @@ func cmdLintBoot() {
 		fmt.Print(result.PrintHuman())
 		if !result.AllClear {
 			os.Exit(1)
+		}
+	}
+
+	// --assert failures always exit 1, in BOTH output modes (Ghost,
+	// 2026-10-17). Deliberately separate from the pre-existing Issues/
+	// AllClear exit path above, which I'm leaving untouched: --json mode
+	// never exits nonzero even when boot-critical Issues are found, only
+	// the human branch does. That looks like the same class of bug as
+	// diff's exit-0-always gap found earlier tonight — EXCEPT lint-boot has
+	// a real shipped consumer, dist/pinscher-boot-check.service, a 3-step
+	// oneshot (lint-boot --json / report --json / profile recommend --json)
+	// that currently relies on none of them failing the unit. Changing that
+	// silently could stop later steps from running and flip the unit to
+	// "failed" on every boot with so much as an info-level finding. Needs a
+	// deliberate decision (Ami/Peter), not a quiet fix bundled in here — so
+	// this PR only makes --assert (brand new, zero existing dependents)
+	// honest, and leaves the older gap as a documented, open finding.
+	if asserts := flagValues("--assert"); len(asserts) > 0 {
+		for _, a := range result.Assertions {
+			if !a.Pass {
+				os.Exit(1)
+			}
 		}
 	}
 }
@@ -815,6 +855,21 @@ func hasFlag(flags ...string) bool {
 	return false
 }
 
+// flagValues collects every value given to a repeatable flag, e.g.
+// `--assert a=1 --assert b=2` -> ["a=1", "b=2"]. Added by Ghost, 2026-10-17,
+// for lint-boot --assert — the first repeatable flag in this CLI, so there's
+// no existing helper for it; hasFlag only detects presence.
+func flagValues(name string) []string {
+	var values []string
+	args := os.Args[2:]
+	for i, arg := range args {
+		if arg == name && i+1 < len(args) {
+			values = append(values, args[i+1])
+		}
+	}
+	return values
+}
+
 func printQuirksHuman(quirks []quirk.Quirk) {
 	if len(quirks) == 0 {
 		fmt.Println("No quirks found.")
@@ -909,6 +964,11 @@ Commands:
   lint-boot           Check initramfs covers all boot-critical drivers
     [path]            Path to initramfs (auto-detected if omitted)
     --json, -j        Output as JSON
+    --assert field:device=value   Assert a device's field equals value
+                      (repeatable). Fields: driver, bus, vendor, device_id,
+                      class, description. Fails (exit 1, both output modes)
+                      if any assertion doesn't hold — independent of the
+                      initramfs check above.
 
   diagnose <device>   Deep diagnosis of a single device
     <device>          PCI address, vendor:device ID, driver name, or description
@@ -991,6 +1051,7 @@ Bus Support:
 Examples:
   pinscher report --json
   pinscher lint-boot
+  pinscher lint-boot --assert "driver:0000:02:00.0=vfio-pci"
   pinscher diagnose 02:00.0
   pinscher diagnose 1002:6799
   pinscher diagnose amdgpu

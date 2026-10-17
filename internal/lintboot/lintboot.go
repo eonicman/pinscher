@@ -29,6 +29,12 @@ type LintResult struct {
 	Issues       []BootIssue `json:"issues"`
 	AllClear     bool        `json:"all_clear"`
 	CheckedCount int         `json:"checked_count"`
+
+	// Assertions is populated only when --assert was used; nil (omitted from
+	// JSON) otherwise, so every existing consumer of lint-boot's output
+	// (including the serve daemon's dispatch) sees an unchanged shape.
+	// Added by Ghost, 2026-10-17, alongside the --assert flag in main.go.
+	Assertions []AssertionResult `json:"assertions,omitempty"`
 }
 
 // Boot-critical device classes (PCI class codes)
@@ -370,22 +376,48 @@ func (r *LintResult) JSON() (string, error) {
 
 // PrintHuman prints the lint result in human-readable format
 func (r *LintResult) PrintHuman() string {
-	if r.AllClear {
-		return fmt.Sprintf("✓ All clear — %d boot-critical devices checked, initramfs covers all drivers.\n", r.CheckedCount)
+	var sb strings.Builder
+
+	if len(r.Issues) == 0 {
+		sb.WriteString(fmt.Sprintf("✓ All clear — %d boot-critical devices checked, initramfs covers all drivers.\n", r.CheckedCount))
+	} else {
+		sb.WriteString(fmt.Sprintf("Pinscher boot lint — %d devices checked, %d issues found:\n\n", r.CheckedCount, len(r.Issues)))
+		for _, issue := range r.Issues {
+			icon := "⚠"
+			if issue.Severity == "fatal" {
+				icon = "✗"
+			} else if issue.Severity == "info" {
+				icon = "ℹ"
+			}
+			sb.WriteString(fmt.Sprintf("%s [%s] %s\n", icon, strings.ToUpper(issue.Severity), issue.Message))
+			sb.WriteString(fmt.Sprintf("  Fix: %s\n\n", issue.Fix))
+		}
 	}
 
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Pinscher boot lint — %d devices checked, %d issues found:\n\n", r.CheckedCount, len(r.Issues)))
-	for _, issue := range r.Issues {
-		icon := "⚠"
-		if issue.Severity == "fatal" {
-			icon = "✗"
-		} else if issue.Severity == "info" {
-			icon = "ℹ"
+	// Assertions (--assert), added by Ghost 2026-10-17: printed regardless of
+	// whether boot-critical issues exist, since a clean initramfs and a
+	// failed passthrough-binding assertion are independent facts.
+	if len(r.Assertions) > 0 {
+		failed := 0
+		for _, a := range r.Assertions {
+			if !a.Pass {
+				failed++
+			}
 		}
-		sb.WriteString(fmt.Sprintf("%s [%s] %s\n", icon, strings.ToUpper(issue.Severity), issue.Message))
-		sb.WriteString(fmt.Sprintf("  Fix: %s\n\n", issue.Fix))
+		sb.WriteString(fmt.Sprintf("\nAssertions — %d checked, %d failed:\n", len(r.Assertions), failed))
+		for _, a := range r.Assertions {
+			if a.Pass {
+				sb.WriteString(fmt.Sprintf("  ✓ %s:%s=%s\n", a.Field, a.Device, a.Expected))
+				continue
+			}
+			if a.Error != "" {
+				sb.WriteString(fmt.Sprintf("  ✗ %s — %s\n", a.Raw, a.Error))
+			} else {
+				sb.WriteString(fmt.Sprintf("  ✗ %s — got %q, expected %q\n", a.Raw, a.Actual, a.Expected))
+			}
+		}
 	}
+
 	return sb.String()
 }
 

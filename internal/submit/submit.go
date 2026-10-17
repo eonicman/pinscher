@@ -18,22 +18,12 @@ func GenerateIssue(deviceQuery string, includeProbe bool) (string, string, error
 		return "", "", fmt.Errorf("probe failed: %w", err)
 	}
 
-	// Find the device
-	var device *probe.Device
-	for i := range probeResult.Devices {
-		d := probeResult.Devices[i]
-		if d.Path == deviceQuery ||
-			strings.HasSuffix(d.Path, "/"+deviceQuery) ||
-			strings.EqualFold(d.Vendor+":"+d.DeviceID, deviceQuery) ||
-			(d.Description != "" && strings.Contains(strings.ToLower(d.Description), strings.ToLower(deviceQuery))) ||
-			d.Driver == deviceQuery {
-			device = &d
-			break
-		}
-	}
-
-	if device == nil {
-		return "", "", fmt.Errorf("no device found matching '%s'", deviceQuery)
+	// Find the device (shared lookup: probe.FindDevice, 2026-10-17 — this used
+	// to be its own inline copy of the same matching rules as
+	// internal/diagnose; consolidated so there's one implementation).
+	device, err := probe.FindDevice(probeResult, deviceQuery)
+	if err != nil {
+		return "", "", err
 	}
 
 	// Find existing quirks for this device

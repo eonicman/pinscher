@@ -1,5 +1,55 @@
 # Pinscher Changelog
 
+## v0.9.2 — `lint-boot --assert`
+
+### New: `pinscher lint-boot --assert field:device=value`
+
+Assert that a device's field (`driver`, `bus`, `vendor`, `device_id`, `class`,
+`description`) equals a given value — e.g. confirm a GPU is bound to
+`vfio-pci` for passthrough before trusting a boot. Repeatable; all assertions
+run against one shared probe of the current system. A malformed assertion
+string is a hard error (it's a typo); a device that can't be found is
+reported as a failed assertion with `Error` set, so one bad query doesn't
+hide every other assertion's result in the same run.
+
+Device identifiers use the same resolution as `diagnose`/`quirk-submit` (PCI
+path, vendor:device ID, driver name, or partial description match) — now a
+single shared implementation (`probe.FindDevice`) instead of three slightly-
+drifted copies.
+
+**Exit code:** `--assert` failures always exit 1, in both `--json` and
+human output. This is new, standalone behavior, not tied to the pre-existing
+driver-missing checks — see the "known, not fixed here" note below.
+
+```bash
+pinscher lint-boot --assert "driver:0000:02:00.0=vfio-pci" --assert "driver:0000:06:00.0=amdgpu"
+```
+
+### Known gap, deliberately NOT fixed here
+
+`lint-boot`'s pre-existing driver-missing checks only exit 1 in human-
+readable mode — `--json` mode has never exited nonzero on failure, only the
+`--assert` path above does. Looks like the same bug class as `diff`'s
+exit-0-always gap (v0.8.1), but `lint-boot` has a real shipped consumer,
+`dist/pinscher-boot-check.service` (a 3-step oneshot: `lint-boot --json` /
+`report --json` / `profile recommend --json`), which currently relies on
+none of those three steps failing the unit. Changing that silently could
+stop the later two steps from running on any boot with so much as an
+info-level finding. Needs a deliberate decision, not a quiet fix.
+
+*(Also found while investigating this: the "boot-counter, auto-revert on
+next boot" mechanism referenced in some design docs doesn't exist anywhere
+in the real code or this systemd unit — `pinscher-boot-check.service` is
+just a logger today, no gating/revert logic. Worth not repeating that
+assumption elsewhere.)*
+
+*Added by Ghost, 2026-10-17, parallel lane to Ami's event-schema work —
+verified via real unit tests (`internal/lintboot/assert_test.go`,
+`cmd/pinscher/flags_test.go`; the CLI path itself couldn't be exercised
+end-to-end on the dev host, which has no initramfs/`lsinitcpio` to lint against).*
+
+---
+
 ## v0.9.1 — Serve Daemon + diff can fail
 
 Merged divergent lines: Annie's v0.9.0 serve daemon + Ghost's v0.8.1

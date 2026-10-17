@@ -35,7 +35,11 @@ type DiagnoseIssue struct {
 // Diagnose performs a deep diagnosis of a single device
 func Diagnose(devicePath string) (*DiagnoseResult, error) {
 	// 1. Find the device in sysfs
-	dev, err := findDevice(devicePath)
+	probeResult, err := probe.Probe()
+	if err != nil {
+		return nil, fmt.Errorf("probe failed: %w", err)
+	}
+	dev, err := probe.FindDevice(probeResult, devicePath)
 	if err != nil {
 		return nil, err
 	}
@@ -77,40 +81,9 @@ func Diagnose(devicePath string) (*DiagnoseResult, error) {
 }
 
 // findDevice locates a device in sysfs by path, PCI address, or partial match
-func findDevice(query string) (*probe.Device, error) {
-	// Run a full probe and find the matching device
-	probeResult, err := probe.Probe()
-	if err != nil {
-		return nil, fmt.Errorf("probe failed: %w", err)
-	}
-
-	for _, dev := range probeResult.Devices {
-		// Match by full sysfs path
-		if dev.Path == query {
-			return &dev, nil
-		}
-		// Match by PCI address (e.g., "0000:02:00.0")
-		if strings.HasSuffix(dev.Path, "/"+query) {
-			return &dev, nil
-		}
-		// Match by vendor:device ID (normalized, no 0x prefix)
-		id := dev.Vendor + ":" + dev.DeviceID
-		queryLower := strings.ToLower(query)
-		if id == queryLower || strings.EqualFold(id, query) {
-			return &dev, nil
-		}
-		// Match by description (partial)
-		if dev.Description != "" && strings.Contains(strings.ToLower(dev.Description), strings.ToLower(query)) {
-			return &dev, nil
-		}
-		// Match by driver name
-		if dev.Driver == query {
-			return &dev, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no device found matching '%s'", query)
-}
+// findDevice used to live here as its own copy of the matching logic; moved
+// to probe.FindDevice (2026-10-17, Ghost) so diagnose/quirk-submit/lint-boot
+// --assert share one implementation instead of three drifting copies.
 
 // diagnoseNoDriver investigates why a device has no driver loaded
 func diagnoseNoDriver(dev *probe.Device, result *DiagnoseResult) {
