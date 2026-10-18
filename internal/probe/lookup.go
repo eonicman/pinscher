@@ -20,6 +20,9 @@ func FindDevice(result *ProbeResult, query string) (*Device, error) {
 		d := result.Devices[i]
 		if d.Path == query ||
 			strings.HasSuffix(d.Path, "/"+query) ||
+			// Short PCI addresses as lspci prints them ("01:00.0") vs sysfs
+			// ("0000:01:00.0"). Added by Ghost, 2026-10-18, found on real hardware.
+			(strings.HasPrefix(d.Path, "/sys/bus/pci/devices/") && strings.HasSuffix(d.Path, ":"+query)) ||
 			strings.EqualFold(d.Vendor+":"+d.DeviceID, query) ||
 			d.Driver == query ||
 			(d.Description != "" && strings.Contains(strings.ToLower(d.Description), strings.ToLower(query))) {

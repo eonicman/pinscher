@@ -1,5 +1,21 @@
 # Pinscher Changelog
 
+## v0.9.3 — fixes from the first real Debian/Ubuntu run
+
+First live run of the Debian path (Ubuntu 24.04, Falcon Northwest "fragbox",
+2026-10-18, by Ghost). Everything below was invisible on Arch and on the dev VM.
+
+- **`lint-boot` auto-detect now finds Debian/Ubuntu initramfs**
+  (`/boot/initrd.img-<ver>`, `/boot/initrd.img`). Previously only Arch paths
+  were checked, so every Debian-family host got "no initramfs found".
+- **`lint-boot --assert x=y` no longer treats `x=y` as the initramfs path.**
+  (Bug in v0.9.2's own argument loop.)
+- **Device lookup accepts short PCI addresses** (`01:00.0`, as `lspci` prints)
+  as well as full sysfs form (`0000:01:00.0`).
+- Test fix: assert test picks a PCI device (an ACPI device broke it).
+- Known, not fixed: `internal/serve` tests report a `Close: use of closed
+  network connection` cleanup error under `-race` (test teardown, not the daemon).
+
 ## v0.9.2 — `lint-boot --assert`
 
 ### New: `pinscher lint-boot --assert field:device=value`
