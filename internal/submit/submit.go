@@ -18,6 +18,10 @@ func GenerateIssue(deviceQuery string, includeProbe bool) (string, string, error
 		return "", "", fmt.Errorf("probe failed: %w", err)
 	}
 
+	// The issue is meant to be posted publicly, so never include the hostname,
+	// full MAC addresses or serial numbers.
+	probeResult.Anonymize()
+
 	// Find the device (shared lookup: probe.FindDevice, 2026-10-17 — this used
 	// to be its own inline copy of the same matching rules as
 	// internal/diagnose; consolidated so there's one implementation).

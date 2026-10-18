@@ -39,7 +39,16 @@ pinscher report
 
 # JSON for scripting/AI consumption
 pinscher report --json
+
+# Safe to post publicly: hostname replaced, MAC addresses keep only the vendor
+# prefix, serial numbers redacted
+pinscher report --json --anonymize
 ```
+
+A plain report includes your hostname and, on machines with WiFi or Bluetooth,
+full MAC addresses. Use `--anonymize` before attaching one to a public issue.
+`quirk-submit` always anonymizes its output. `diagnose` output includes kernel
+log excerpts that `--anonymize` does not cover, so read it before posting.
 
 ### `pinscher lint-boot`
 The killer feature — check that your initramfs contains all drivers needed for

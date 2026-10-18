@@ -41,7 +41,9 @@ go build ./...
 
 ### Reporting Hardware Issues
 
-Run `pinscher report --json > my-system.json` and `pinscher diagnose <device> --json > diagnosis.json` and include both in your issue.
+Run `pinscher report --json --anonymize > my-system.json` and `pinscher diagnose <device> --json > diagnosis.json` and include both in your issue.
+
+`--anonymize` replaces your hostname, keeps only the vendor prefix of MAC addresses, and redacts serial numbers. It does not cover `diagnose`, whose output can include kernel log lines, so skim `diagnosis.json` for anything private before posting it.
 
 ## Development Setup
 

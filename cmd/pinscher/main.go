@@ -83,6 +83,12 @@ func cmdReport() {
 		os.Exit(1)
 	}
 
+	// Opt-in: a saved report is also used for local snapshots and diffs, so the
+	// default output is unchanged. Use --anonymize before posting one publicly.
+	if hasFlag("--anonymize") {
+		result.Anonymize()
+	}
+
 	jsonOutput := hasFlag("--json", "-j")
 	if jsonOutput {
 		out, err := result.JSON()
@@ -668,6 +674,9 @@ func cmdQuirkSubmit() {
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "  <device>    PCI address, vendor:device ID, driver name, or description")
 		fmt.Fprintln(os.Stderr, "  --probe     Include full hardware probe data in the issue")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "The generated issue is anonymized (hostname replaced, MAC addresses masked,")
+		fmt.Fprintln(os.Stderr, "serial numbers redacted) because it is meant to be posted publicly.")
 		os.Exit(1)
 	}
 
@@ -967,8 +976,11 @@ Commands:
                       Discovers PCI, USB, platform, ACPI, Bluetooth, and WiFi devices
                       with human-readable names and capability details
     --json, -j        Output as JSON
+    --anonymize       Replace the hostname, mask MAC addresses (keeps the vendor
+                      prefix) and redact serial numbers. Use before posting a
+                      report publicly.
 
-  lint-boot           Check initramfs covers all boot-critical drivers
+  lint-boot          Check initramfs covers all boot-critical drivers
     [path]            Path to initramfs (auto-detected if omitted)
     --json, -j        Output as JSON
     --assert field:device=value   Assert a device's field equals value

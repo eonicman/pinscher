@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **New: `pinscher report --anonymize`.** A plain report contains the hostname
+  and, on machines with WiFi or Bluetooth, full MAC addresses, and
+  CONTRIBUTING asked people to paste reports into public issues. `--anonymize`
+  replaces the hostname, keeps only the vendor prefix of each MAC address
+  (`4c:74:bf:xx:xx:xx`), and redacts any capability whose key mentions
+  "serial". Hardware IDs, drivers and descriptions are untouched. Opt-in for
+  `report`, so saved snapshots and `diff` behave as before.
+- **Changed: `quirk-submit` output is always anonymized.** Its issue template
+  previously always printed the hostname. It is meant to be posted publicly.
+- **Not covered:** `diagnose` output includes kernel log excerpts that are not
+  anonymized, and the `serve` daemon's `report` method is unchanged. Both are
+  noted in the docs.
 - **Fix: `internal/serve` test teardown error.** `Server.Close()` returned
   `use of closed network connection` when `Serve` had already closed the
   listener on context cancellation. `Close()` now treats an already-closed
