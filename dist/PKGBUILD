@@ -2,7 +2,7 @@
 # Contributor: Built by Bots <https://github.com/eonicman>
 
 pkgname=pinscher
-pkgver=0.4.0
+pkgver=0.9.3
 pkgrel=1
 pkgdesc="Hardware orchestration layer — probe, diagnose, and lint boot-critical hardware"
 arch=('x86_64')
