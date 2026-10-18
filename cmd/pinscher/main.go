@@ -98,8 +98,15 @@ func cmdReport() {
 
 func cmdLintBoot() {
 	initramfsPath := ""
-	for _, arg := range os.Args[2:] {
-		if arg == "--json" || arg == "-j" {
+	args := os.Args[2:]
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--assert" {
+			// Ghost, 2026-10-18: skip the flag's value. Before this, the
+			// value of `--assert x=y` was taken as the initramfs path
+			// (found on real hardware; no initramfs on the dev VM).
+			i++
+		} else if arg == "--json" || arg == "-j" {
 		} else if !strings.HasPrefix(arg, "-") {
 			initramfsPath = arg
 		}

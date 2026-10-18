@@ -316,12 +316,17 @@ func isBuiltinModule(module, kernelVersion string) bool {
 
 // findInitramfs finds the default initramfs for the running kernel
 func findInitramfs(kernelVersion string) string {
-	// Try standard Arch Linux locations
+	// Arch Linux locations first, then Debian/Ubuntu (initramfs-tools).
+	// Debian-family paths added by Ghost, 2026-10-18, after a real run on
+	// Ubuntu 24.04 (fragbox) reported "no initramfs found" -- the Debian
+	// path of lint-boot had never been exercised on real hardware before.
 	candidates := []string{
 		fmt.Sprintf("/boot/initramfs-%s.img", kernelVersion),
 		fmt.Sprintf("/boot/initramfs-%s-fallback.img", kernelVersion),
 		"/boot/initramfs-linux.img",
 		"/boot/initramfs-linux-fallback.img",
+		fmt.Sprintf("/boot/initrd.img-%s", kernelVersion),
+		"/boot/initrd.img",
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {

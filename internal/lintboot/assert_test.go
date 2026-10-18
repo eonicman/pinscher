@@ -1,6 +1,7 @@
 package lintboot
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/eonicman/pinscher/internal/probe"
@@ -78,11 +79,10 @@ func TestCheckAssertionsAgainstRealHardware(t *testing.T) {
 	}
 	var realDevice, realDriver string
 	for _, d := range probeResult.Devices {
-		if d.Driver != "" {
-			realDevice = d.Path[len("/sys/bus/pci/devices/"):]
-			if realDevice == d.Path { // not a PCI sysfs path shaped as expected; fall back to full path
-				realDevice = d.Path
-			}
+		// PCI devices only: ACPI/platform paths have other shapes (found on a
+		// real Ubuntu box where the first driver-bound device was ACPI).
+		if d.Driver != "" && strings.HasPrefix(d.Path, "/sys/bus/pci/devices/") {
+			realDevice = strings.TrimPrefix(d.Path, "/sys/bus/pci/devices/")
 			realDriver = d.Driver
 			break
 		}
