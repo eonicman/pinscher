@@ -152,9 +152,13 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 }
 
-// Close stops the listener and removes the socket file.
+// Close stops the listener and removes the socket file. It is safe to call
+// after Serve has already closed the listener on context cancellation.
 func (s *Server) Close() error {
 	err := s.ln.Close()
+	if errors.Is(err, net.ErrClosed) {
+		err = nil
+	}
 	if rmErr := os.Remove(s.path); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) && err == nil {
 		err = rmErr
 	}
