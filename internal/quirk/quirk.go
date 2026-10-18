@@ -13,7 +13,7 @@ type Quirk struct {
 	Citation    string            `json:"citation"`     // URL or reference to source
 	KernelMin   string            `json:"kernel_min"`   // minimum kernel version (empty = all)
 	KernelMax   string            `json:"kernel_max"`   // maximum kernel version (empty = all)
-	Severity    string            `json:"severity"`    // "fatal", "warning", "info"
+	Severity    string            `json:"severity"`     // "fatal", "warning", "info"
 	Verified    bool              `json:"verified"`     // verified on real hardware
 }
 

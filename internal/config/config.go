@@ -10,15 +10,15 @@ import (
 
 // Operation represents a config read or write operation
 type Operation struct {
-	Timestamp  time.Time `json:"timestamp"`
-	Module     string    `json:"module"`
-	Param      string    `json:"param"`
-	OldValue   string    `json:"old_value"`
-	NewValue   string    `json:"new_value"`
-	DryRun     bool      `json:"dry_run"`
-	Success    bool      `json:"success"`
-	Error      string    `json:"error,omitempty"`
-	RequestedBy string   `json:"requested_by"`
+	Timestamp   time.Time `json:"timestamp"`
+	Module      string    `json:"module"`
+	Param       string    `json:"param"`
+	OldValue    string    `json:"old_value"`
+	NewValue    string    `json:"new_value"`
+	DryRun      bool      `json:"dry_run"`
+	Success     bool      `json:"success"`
+	Error       string    `json:"error,omitempty"`
+	RequestedBy string    `json:"requested_by"`
 }
 
 // AuditLog records all config operations
@@ -28,23 +28,23 @@ var auditLog []Operation
 type SafetyLevel int
 
 const (
-	Safe    SafetyLevel = iota // read-only params, informational
-	Warning                     // writable but reversible
-	Dangerous                   // could affect system stability
-	Blocked                     // refuse to write (storage controllers, USB host, etc.)
+	Safe      SafetyLevel = iota // read-only params, informational
+	Warning                      // writable but reversible
+	Dangerous                    // could affect system stability
+	Blocked                      // refuse to write (storage controllers, USB host, etc.)
 )
 
 // paramSafety defines which module/param combinations are safe to write
 var paramSafety = map[string]map[string]SafetyLevel{
 	"amdgpu": {
-		"si_support":      Safe,    // needed for Tahiti XT, well-tested
-		"dc":              Safe,    // display core enable
-		"hwpi":            Warning, // hardware page queue implementation
-		"ppfeaturemask":   Warning, // power play features
-		"vram_post_div":   Warning,
-		"lockup_timeout":  Warning,
-		"benchmarking":    Warning,
-		"test":            Blocked, // debug only
+		"si_support":     Safe,    // needed for Tahiti XT, well-tested
+		"dc":             Safe,    // display core enable
+		"hwpi":           Warning, // hardware page queue implementation
+		"ppfeaturemask":  Warning, // power play features
+		"vram_post_div":  Warning,
+		"lockup_timeout": Warning,
+		"benchmarking":   Warning,
+		"test":           Blocked, // debug only
 	},
 	"nvme": {
 		"default_ps_max_latency_us": Warning,
@@ -52,15 +52,15 @@ var paramSafety = map[string]map[string]SafetyLevel{
 		"write_queues":              Warning,
 	},
 	"snd_hda_intel": {
-		"model":         Safe,
-		"position_fix":  Warning,
-		"probe_mask":    Warning,
-		"single_cmd":    Warning,
-		"snoop":         Warning,
+		"model":        Safe,
+		"position_fix": Warning,
+		"probe_mask":   Warning,
+		"single_cmd":   Warning,
+		"snoop":        Warning,
 	},
 	"xhci_hcd": {
-		"streams":        Warning,
-		"quirks":         Warning,
+		"streams": Warning,
+		"quirks":  Warning,
 	},
 	// Default: unknown params are Blocked
 }
@@ -78,11 +78,11 @@ func GetParam(module, param string) (string, error) {
 // SetParam writes a module parameter value with safety checks
 func SetParam(module, param, value string, dryRun bool) (*Operation, error) {
 	op := &Operation{
-		Timestamp:  time.Now(),
-		Module:     module,
-		Param:      param,
-		NewValue:   value,
-		DryRun:     dryRun,
+		Timestamp:   time.Now(),
+		Module:      module,
+		Param:       param,
+		NewValue:    value,
+		DryRun:      dryRun,
 		RequestedBy: "ami",
 	}
 

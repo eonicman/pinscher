@@ -14,22 +14,22 @@ import (
 
 // DiagnoseResult is the output of pinscher diagnose
 type DiagnoseResult struct {
-	Device     probe.Device     `json:"device"`
-	Driver     string           `json:"driver"`      // loaded driver name (empty if none)
-	Status     string           `json:"status"`      // "ok", "no_driver", "driver_loaded_but_broken", "quirk_needed"
-	Issues     []DiagnoseIssue  `json:"issues"`
-	Quirks     []quirk.Quirk    `json:"quirks"`      // applicable quirks
+	Device      probe.Device    `json:"device"`
+	Driver      string          `json:"driver"` // loaded driver name (empty if none)
+	Status      string          `json:"status"` // "ok", "no_driver", "driver_loaded_but_broken", "quirk_needed"
+	Issues      []DiagnoseIssue `json:"issues"`
+	Quirks      []quirk.Quirk   `json:"quirks"`      // applicable quirks
 	Suggestions []string        `json:"suggestions"` // human-readable fix suggestions
 }
 
 // DiagnoseIssue represents a specific problem found during diagnosis
 type DiagnoseIssue struct {
-	Severity  string `json:"severity"`   // "fatal", "warning", "info"
-	Class    string `json:"class"`       // "no_module", "blacklisted", "firmware_missing", "param_wrong", "hardware_error", "quirk"
-	Module   string `json:"module"`     // related module
-	Message  string `json:"message"`    // what's wrong
-	Fix      string `json:"fix"`         // how to fix it
-	Source   string `json:"source"`    // "sysfs", "dmesg", "quirk_db", "modprobe"
+	Severity string `json:"severity"` // "fatal", "warning", "info"
+	Class    string `json:"class"`    // "no_module", "blacklisted", "firmware_missing", "param_wrong", "hardware_error", "quirk"
+	Module   string `json:"module"`   // related module
+	Message  string `json:"message"`  // what's wrong
+	Fix      string `json:"fix"`      // how to fix it
+	Source   string `json:"source"`   // "sysfs", "dmesg", "quirk_db", "modprobe"
 }
 
 // Diagnose performs a deep diagnosis of a single device

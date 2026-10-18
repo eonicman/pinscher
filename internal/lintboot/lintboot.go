@@ -40,36 +40,36 @@ type LintResult struct {
 // Boot-critical device classes (PCI class codes)
 // These are the devices that MUST have drivers in the initramfs
 var bootCriticalClasses = map[string]string{
-	"0101":  "storage",  // IDE
-	"0102":  "storage",  // Floppy
-	"0104":  "storage",  // RAID
-	"0105":  "storage",  // ATA
-	"0106":  "storage",  // SATA
-	"0107":  "storage",  // Serial Attached SCSI
-	"0108":  "storage",  // NVMe
-	"010802": "storage",  // NVMe (full class)
-	"0c03":  "usb",      // USB Controller (generic)
+	"0101":   "storage", // IDE
+	"0102":   "storage", // Floppy
+	"0104":   "storage", // RAID
+	"0105":   "storage", // ATA
+	"0106":   "storage", // SATA
+	"0107":   "storage", // Serial Attached SCSI
+	"0108":   "storage", // NVMe
+	"010802": "storage", // NVMe (full class)
+	"0c03":   "usb",     // USB Controller (generic)
 	"0c0300": "usb",     // UHCI
 	"0c0310": "usb",     // OHCI
 	"0c0320": "usb",     // EHCI
 	"0c0330": "usb",     // xHCI
-	"0300":  "gpu",      // VGA
+	"0300":   "gpu",     // VGA
 	"030000": "gpu",     // VGA (full class)
-	"0302":  "gpu",      // 3D Controller
+	"0302":   "gpu",     // 3D Controller
 	"030200": "gpu",     // 3D Controller (full class)
-	"0200":  "network",  // Ethernet
+	"0200":   "network", // Ethernet
 	"020000": "network", // Ethernet (full class)
-	"0280":  "network",  // Wireless
+	"0280":   "network", // Wireless
 	"028000": "network", // Wireless (full class)
-	"0801":  "crypto",   // HW Cryptographic device
-	"0805":  "input",    // SD Host controller
+	"0801":   "crypto",  // HW Cryptographic device
+	"0805":   "input",   // SD Host controller
 }
 
 // Boot-critical platform modalias patterns (matched by prefix)
 var bootCriticalPlatformModalias = map[string]string{
-	"acpi:PNP0C0C": "input",   // Power button
-	"acpi:PNP0C0E": "input",   // Sleep button
-	"acpi:PNP0C09": "input",   // Embedded controller
+	"acpi:PNP0C0C":      "input", // Power button
+	"acpi:PNP0C0E":      "input", // Sleep button
+	"acpi:PNP0C09":      "input", // Embedded controller
 	"platform:applesmc": "input", // Apple SMC (fans, sensors, lid)
 }
 
@@ -141,41 +141,41 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 
 			for _, module := range modules {
 				// Deduplicate by module+category
-			dedupKey := module + ":" + category
-			if seenModules[dedupKey] {
-				continue
+				dedupKey := module + ":" + category
+				if seenModules[dedupKey] {
+					continue
+				}
+				seenModules[dedupKey] = true
+				result.CheckedCount++
+
+				// Check if module is in initramfs
+				if !moduleSet[module] {
+					// Also check for builtin modules (they don't need to be in initramfs)
+					if isBuiltinModule(module, result.Kernel) {
+						continue // Builtin is fine
+					}
+
+					issue := BootIssue{
+						Severity: severityForCategory(category),
+						Class:    category,
+						Device:   dev.Description,
+						Module:   module,
+						Message:  fmt.Sprintf("%s module '%s' is missing from initramfs — %s may not work at boot", category, module, category),
+						Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
+					}
+
+					// Enhance message for specific categories
+					if category == "usb" {
+						issue.Message = fmt.Sprintf("USB host controller driver '%s' missing from initramfs — keyboard may be dead at LUKS prompt", module)
+						issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
+					} else if category == "storage" {
+						issue.Message = fmt.Sprintf("Storage controller driver '%s' missing from initramfs — root filesystem may not mount", module)
+						issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
+					}
+
+					result.Issues = append(result.Issues, issue)
+				}
 			}
-			seenModules[dedupKey] = true
-			result.CheckedCount++
-
-			// Check if module is in initramfs
-			if !moduleSet[module] {
-				// Also check for builtin modules (they don't need to be in initramfs)
-				if isBuiltinModule(module, result.Kernel) {
-					continue // Builtin is fine
-				}
-
-				issue := BootIssue{
-					Severity: severityForCategory(category),
-					Class:    category,
-					Device:   dev.Description,
-					Module:   module,
-					Message:  fmt.Sprintf("%s module '%s' is missing from initramfs — %s may not work at boot", category, module, category),
-					Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
-				}
-
-				// Enhance message for specific categories
-				if category == "usb" {
-					issue.Message = fmt.Sprintf("USB host controller driver '%s' missing from initramfs — keyboard may be dead at LUKS prompt", module)
-					issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
-				} else if category == "storage" {
-					issue.Message = fmt.Sprintf("Storage controller driver '%s' missing from initramfs — root filesystem may not mount", module)
-					issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
-				}
-
-				result.Issues = append(result.Issues, issue)
-			}
-		}
 		}
 
 		// --- Platform/ACPI boot-critical check ---

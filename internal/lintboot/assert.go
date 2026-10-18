@@ -9,11 +9,11 @@ import (
 
 // AssertionResult is the outcome of one `--assert` check.
 type AssertionResult struct {
-	Raw      string `json:"raw"`             // the original "field:device=value" string, verbatim
+	Raw      string `json:"raw"` // the original "field:device=value" string, verbatim
 	Field    string `json:"field"`
-	Device   string `json:"device"`          // the device-identifier query, as given
+	Device   string `json:"device"` // the device-identifier query, as given
 	Expected string `json:"expected"`
-	Actual   string `json:"actual"`          // empty if the device wasn't found
+	Actual   string `json:"actual"` // empty if the device wasn't found
 	Pass     bool   `json:"pass"`
 	Error    string `json:"error,omitempty"` // set only when the device lookup itself failed
 }

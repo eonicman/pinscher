@@ -23,38 +23,38 @@ const (
 
 // HardwareEvent represents a detected hardware change
 type HardwareEvent struct {
-	Timestamp time.Time   `json:"timestamp"`
-	Type      EventType   `json:"type"`
+	Timestamp time.Time    `json:"timestamp"`
+	Type      EventType    `json:"type"`
 	Device    probe.Device `json:"device"`
-	Message   string      `json:"message"`
+	Message   string       `json:"message"`
 }
 
 // WatchResult contains the final state when watch ends
 type WatchResult struct {
-	StartTime    time.Time        `json:"start_time"`
-	EndTime      time.Time        `json:"end_time"`
-	EventsSeen   int              `json:"events_seen"`
-	SnapBefore   *probe.ProbeResult `json:"snap_before"`
-	SnapAfter    *probe.ProbeResult `json:"snap_after"`
+	StartTime  time.Time          `json:"start_time"`
+	EndTime    time.Time          `json:"end_time"`
+	EventsSeen int                `json:"events_seen"`
+	SnapBefore *probe.ProbeResult `json:"snap_before"`
+	SnapAfter  *probe.ProbeResult `json:"snap_after"`
 }
 
 // WatchOptions configures the watch behavior
 type WatchOptions struct {
-	Duration      time.Duration // 0 = run until interrupted
-	JSON          bool          // output events as JSON
-	Quiet         bool          // suppress continuous output
+	Duration      time.Duration       // 0 = run until interrupted
+	JSON          bool                // output events as JSON
+	Quiet         bool                // suppress continuous output
 	OnEvent       func(HardwareEvent) // callback for each event
-	SnapshotFirst bool          // take initial probe snapshot before watching
+	SnapshotFirst bool                // take initial probe snapshot before watching
 }
 
 // Watcher monitors hardware changes via udev/netlink and periodic snapshots
 type Watcher struct {
-	mu          sync.Mutex
-	options     WatchOptions
-	events      []HardwareEvent
-	snapBefore  *probe.ProbeResult
-	snapAfter   *probe.ProbeResult
-	stopCh      chan struct{}
+	mu         sync.Mutex
+	options    WatchOptions
+	events     []HardwareEvent
+	snapBefore *probe.ProbeResult
+	snapAfter  *probe.ProbeResult
+	stopCh     chan struct{}
 }
 
 // NewWatcher creates a new hardware watcher
@@ -150,11 +150,11 @@ done:
 	}
 
 	return &WatchResult{
-		StartTime:    startTime,
-		EndTime:      endTime,
-		EventsSeen:   len(w.events),
-		SnapBefore:   w.snapBefore,
-		SnapAfter:    w.snapAfter,
+		StartTime:  startTime,
+		EndTime:    endTime,
+		EventsSeen: len(w.events),
+		SnapBefore: w.snapBefore,
+		SnapAfter:  w.snapAfter,
 	}, nil
 }
 
@@ -228,11 +228,11 @@ pollDone:
 	w.snapAfter = prevSnap
 
 	return &WatchResult{
-		StartTime:    startTime,
-		EndTime:      endTime,
-		EventsSeen:   len(w.events),
-		SnapBefore:   w.snapBefore,
-		SnapAfter:    w.snapAfter,
+		StartTime:  startTime,
+		EndTime:    endTime,
+		EventsSeen: len(w.events),
+		SnapBefore: w.snapBefore,
+		SnapAfter:  w.snapAfter,
 	}, nil
 }
 

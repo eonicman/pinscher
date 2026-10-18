@@ -34,8 +34,8 @@ import (
 	"github.com/eonicman/pinscher/internal/config"
 	"github.com/eonicman/pinscher/internal/diagnose"
 	"github.com/eonicman/pinscher/internal/lintboot"
-	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/probe"
+	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/quirk"
 )
 

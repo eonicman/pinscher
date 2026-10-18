@@ -41,47 +41,47 @@ func (r SynthesisRung) String() string {
 
 // SynthesizeRequest is the input to the synthesis engine
 type SynthesizeRequest struct {
-	Device     probe.Device     // the device to synthesize for
-	DiagResult *DiagSummary    // optional diagnosis summary
-	Rung       SynthesisRung    // which rung to target
-	KernelSrc  string           // path to kernel source (for Rung 3+)
-	DryRun     bool             // don't apply anything
-	Model      string           // Ollama model name (default: llama3.1)
+	Device     probe.Device  // the device to synthesize for
+	DiagResult *DiagSummary  // optional diagnosis summary
+	Rung       SynthesisRung // which rung to target
+	KernelSrc  string        // path to kernel source (for Rung 3+)
+	DryRun     bool          // don't apply anything
+	Model      string        // Ollama model name (default: llama3.1)
 }
 
 // DiagSummary is a lightweight summary of diagnose results for the LLM
 type DiagSummary struct {
-	Status     string   `json:"status"`
-	Driver     string   `json:"driver"`
-	Issues     []string `json:"issues"`
-	Quirks     []string `json:"quirks"`
+	Status      string   `json:"status"`
+	Driver      string   `json:"driver"`
+	Issues      []string `json:"issues"`
+	Quirks      []string `json:"quirks"`
 	Suggestions []string `json:"suggestions"`
 }
 
 // SynthesizeResult is the output of the synthesis engine
 type SynthesizeResult struct {
-	Device      probe.Device     `json:"device"`
-	Rung        SynthesisRung    `json:"rung"`
-	Method      string           `json:"method"`       // "llm", "database", "hybrid"
-	Confidence  string           `json:"confidence"`   // "high", "medium", "low", "experimental"
-	Proposals   []Proposal       `json:"proposals"`
-	Warnings    []string         `json:"warnings"`
-	RawLLM      string           `json:"raw_llm,omitempty"` // raw LLM response for debugging
+	Device     probe.Device  `json:"device"`
+	Rung       SynthesisRung `json:"rung"`
+	Method     string        `json:"method"`     // "llm", "database", "hybrid"
+	Confidence string        `json:"confidence"` // "high", "medium", "low", "experimental"
+	Proposals  []Proposal    `json:"proposals"`
+	Warnings   []string      `json:"warnings"`
+	RawLLM     string        `json:"raw_llm,omitempty"` // raw LLM response for debugging
 }
 
 // Proposal is a single synthesis proposal
 type Proposal struct {
-	Type        string            `json:"type"`         // "quirk", "module_param", "udev_rule", "firmware", "modprobe_conf", "userspace_driver", "kernel_patch"
+	Type        string            `json:"type"` // "quirk", "module_param", "udev_rule", "firmware", "modprobe_conf", "userspace_driver", "kernel_patch"
 	Rung        SynthesisRung     `json:"rung"`
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
-	Action      string            `json:"action"`       // what to do
-	Commands    []string          `json:"commands"`     // shell commands to apply (empty if dry-run)
+	Action      string            `json:"action"`          // what to do
+	Commands    []string          `json:"commands"`        // shell commands to apply (empty if dry-run)
 	Files       map[string]string `json:"files,omitempty"` // files to write (path → content)
-	Rollback    []string          `json:"rollback"`     // commands to undo
-	Reasoning   string            `json:"reasoning"`    // why this proposal
-	Citation    string            `json:"citation"`     // source/reference
-	Verified    bool              `json:"verified"`     // tested on real hardware?
+	Rollback    []string          `json:"rollback"`        // commands to undo
+	Reasoning   string            `json:"reasoning"`       // why this proposal
+	Citation    string            `json:"citation"`        // source/reference
+	Verified    bool              `json:"verified"`        // tested on real hardware?
 }
 
 // ollamaRequest/Response for the Ollama API

@@ -14,24 +14,24 @@ import (
 
 // Profile represents a hardware configuration profile
 type Profile struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Intent      string            `json:"intent"`      // "gaming", "low-power", "audio", "vr", "server", "development"
-	Author      string            `json:"author"`
-	Version     string            `json:"version"`
-	Settings    []ProfileSetting  `json:"settings"`
-	Matches     []ProfileMatch    `json:"matches,omitempty"` // hardware conditions for auto-apply
-	Conflicts   []string          `json:"conflicts,omitempty"` // profile IDs this conflicts with
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Intent      string           `json:"intent"` // "gaming", "low-power", "audio", "vr", "server", "development"
+	Author      string           `json:"author"`
+	Version     string           `json:"version"`
+	Settings    []ProfileSetting `json:"settings"`
+	Matches     []ProfileMatch   `json:"matches,omitempty"`   // hardware conditions for auto-apply
+	Conflicts   []string         `json:"conflicts,omitempty"` // profile IDs this conflicts with
 }
 
 // ProfileSetting is a single configuration entry
 type ProfileSetting struct {
-	Module     string            `json:"module"`
-	Param      string            `json:"param"`
-	Value      string            `json:"value"`
-	Reason     string            `json:"reason"`
-	Severity   string            `json:"severity"` // "safe", "warning", "dangerous"
-	Source     string            `json:"source"`   // "quirk_db", "profile", "manual"
+	Module   string `json:"module"`
+	Param    string `json:"param"`
+	Value    string `json:"value"`
+	Reason   string `json:"reason"`
+	Severity string `json:"severity"` // "safe", "warning", "dangerous"
+	Source   string `json:"source"`   // "quirk_db", "profile", "manual"
 }
 
 // ProfileMatch defines hardware conditions for a profile
@@ -43,10 +43,10 @@ type ProfileMatch struct {
 
 // ApplyResult is the result of applying a profile
 type ApplyResult struct {
-	Profile   string             `json:"profile"`
-	Applied   []config.Operation `json:"applied"`
-	Skipped   []SkippedSetting   `json:"skipped"`
-	Errors    []string           `json:"errors"`
+	Profile string             `json:"profile"`
+	Applied []config.Operation `json:"applied"`
+	Skipped []SkippedSetting   `json:"skipped"`
+	Errors  []string           `json:"errors"`
 }
 
 // SkippedSetting records why a setting was skipped
@@ -151,7 +151,7 @@ var BuiltinProfiles = []Profile{
 			{Module: "amdgpu", Param: "dc", Value: "1", Reason: "Enable Display Core for actual display output on mini-DisplayPort", Severity: "safe", Source: "quirk_db"},
 		},
 		Matches: []ProfileMatch{
-			{Type: "vendor_id", Values: []string{"1002"}, Required: false},   // AMD
+			{Type: "vendor_id", Values: []string{"1002"}, Required: false},                 // AMD
 			{Type: "device_id", Values: []string{"6799", "6798", "679a"}, Required: false}, // Tahiti XT
 		},
 	},

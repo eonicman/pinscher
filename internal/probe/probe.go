@@ -13,17 +13,17 @@ import (
 
 // Device represents a single hardware device discovered via sysfs
 type Device struct {
-	Bus         string            `json:"bus"`          // pci, usb, platform, acpi, bluetooth, wifi, etc.
-	Path        string            `json:"path"`         // sysfs path
-	Vendor      string            `json:"vendor"`       // vendor ID (e.g. "1002" for AMD)
-	DeviceID    string            `json:"device_id"`    // device ID
-	Subsystem   string            `json:"subsystem"`    // subsystem vendor:device
-	Class       string            `json:"class"`        // device class (e.g. "030000" for VGA)
-	ClassName   string            `json:"class_name"`   // human-readable class name (e.g. "VGA controller")
-	Modalias    string            `json:"modalias"`     // kernel modalias string
-	Driver      string            `json:"driver"`       // loaded driver (empty if none)
-	Description string            `json:"description"`  // human-readable description from pci.ids/usb.ids
-	Revision    string            `json:"revision"`     // hardware revision
+	Bus          string            `json:"bus"`                    // pci, usb, platform, acpi, bluetooth, wifi, etc.
+	Path         string            `json:"path"`                   // sysfs path
+	Vendor       string            `json:"vendor"`                 // vendor ID (e.g. "1002" for AMD)
+	DeviceID     string            `json:"device_id"`              // device ID
+	Subsystem    string            `json:"subsystem"`              // subsystem vendor:device
+	Class        string            `json:"class"`                  // device class (e.g. "030000" for VGA)
+	ClassName    string            `json:"class_name"`             // human-readable class name (e.g. "VGA controller")
+	Modalias     string            `json:"modalias"`               // kernel modalias string
+	Driver       string            `json:"driver"`                 // loaded driver (empty if none)
+	Description  string            `json:"description"`            // human-readable description from pci.ids/usb.ids
+	Revision     string            `json:"revision"`               // hardware revision
 	Capabilities map[string]string `json:"capabilities,omitempty"` // device capabilities/features
 }
 
@@ -37,9 +37,9 @@ type ProbeResult struct {
 
 // Summary counts devices by bus and driver status
 type Summary struct {
-	Total      int `json:"total"`
-	WithDriver int `json:"with_driver"`
-	NoDriver   int `json:"no_driver"`
+	Total      int            `json:"total"`
+	WithDriver int            `json:"with_driver"`
+	NoDriver   int            `json:"no_driver"`
 	ByBus      map[string]int `json:"by_bus"`
 }
 
@@ -640,7 +640,7 @@ func probeWiFi() ([]Device, error) {
 					d.Vendor = part // Store PCI address for cross-reference
 
 					// Read vendor/device IDs from the PCI device
-				pciPath := filepath.Join("/sys/bus/pci/devices/", part)
+					pciPath := filepath.Join("/sys/bus/pci/devices/", part)
 					if vendor := readSysFile(filepath.Join(pciPath, "vendor")); vendor != "" {
 						d.Vendor = strings.TrimPrefix(vendor, "0x")
 					}

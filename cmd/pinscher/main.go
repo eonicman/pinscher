@@ -10,8 +10,8 @@ import (
 	"github.com/eonicman/pinscher/internal/config"
 	"github.com/eonicman/pinscher/internal/diagnose"
 	"github.com/eonicman/pinscher/internal/lintboot"
-	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/probe"
+	"github.com/eonicman/pinscher/internal/profile"
 	"github.com/eonicman/pinscher/internal/quirk"
 	"github.com/eonicman/pinscher/internal/serve"
 	"github.com/eonicman/pinscher/internal/submit"
@@ -771,7 +771,7 @@ func cmdProfile() {
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
-		}
+			}
 			fmt.Println(data)
 		} else {
 			fmt.Print(profile.PrintProfileHuman(p))
