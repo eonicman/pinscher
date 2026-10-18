@@ -5,9 +5,18 @@ between the kernel and OS-level AI agents. It discovers hardware, diagnoses driv
 failures, and exposes a structured API for querying, configuring, and grouping
 subsystems by intent.
 
-**Status:** v0.9.0 — Phases 1–5 complete, plus the profile system (v0.7.0), quirk-submit (v0.8.0), and the `serve` daemon: a persistent hardware intelligence layer exposing the JSON API over a local Unix socket. Watch mode, diff, expanded quirk DB (22 entries, 9 categories), driver synthesis. See [CONCEPT.md](CONCEPT.md) for the full design.
+**Status:** v0.9.3, pre-1.0. Probing across six buses, `lint-boot`, diagnosis, a
+22-entry quirk database, hardware profiles, watch and diff, a `serve` daemon
+exposing the JSON API over a local Unix socket, and an opt-in driver-synthesis
+proposer. See [CONCEPT.md](CONCEPT.md) for the longer-term design, which is
+**ahead of** what is implemented.
 
-A [Built by Bots](https://github.com/eonicman) project.
+**What has been tested on real hardware:** a 2013 Mac Pro 6,1 on CachyOS (Arch),
+and an Ubuntu 24.04 desktop (ASUS Maximus III GENE, i7-875K). Anything else is
+unverified. Bug reports from other hardware are the most useful thing you can
+send; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Built by AI agents as part of the [Built by Bots](https://github.com/eonicman) project.
 
 *(Note: it's Pinscher — with the s. The dog, not the grip.)*
 
@@ -176,18 +185,18 @@ pinscher diff before.json --json
 Apply multiple settings from a profile file (key=value format, comments allowed).
 
 ```bash
-# Annie (Mac Pro 6,1) profile example
-cat > /etc/pinscher/annie.profile <<EOF
+# Mac Pro 6,1 profile example
+cat > /etc/pinscher/macpro61.profile <<EOF
 # Mac Pro 6,1 hardware profile
 amdgpu.si_support=1
 amdgpu.dc=1
 EOF
 
 # Preview
-pinscher apply /etc/pinscher/annie.profile --dry-run
+pinscher apply /etc/pinscher/macpro61.profile --dry-run
 
 # Apply
-sudo pinscher apply /etc/pinscher/annie.profile
+sudo pinscher apply /etc/pinscher/macpro61.profile
 ```
 
 ### `pinscher audit-log`
@@ -379,13 +388,19 @@ All operations are logged to the audit log.
 
 ## Origin Story
 
-Born from a real problem: CachyOS ISO built on a cloud VPS had `autodetect` in
-mkinitcpio HOOKS, which stripped USB host controller drivers from the initramfs.
-The Mac Pro 6,1 couldn't boot the live ISO — "Cannot open access to console, the
-root account is locked." Every manual fix we applied is something Pinscher should
-do automatically.
+Born from a real problem: a custom CachyOS live ISO, built on a cloud VPS, had
+`autodetect` in the mkinitcpio HOOKS, which stripped USB host controller
+drivers from the initramfs. The Mac Pro 6,1 couldn't boot the live ISO —
+"Cannot open access to console, the root account is locked." Every manual fix
+we applied is something Pinscher should do automatically.
 
-`pinscher lint-boot` would have caught this in three seconds. The bug ate four days.
+`pinscher lint-boot` is meant to catch exactly this before the reboot. The bug
+cost about four days.
+
+## Contributing and contact
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs are welcome. For
+anything that doesn't fit an issue, write to ghost@eonic.cloud.
 
 ## License
 

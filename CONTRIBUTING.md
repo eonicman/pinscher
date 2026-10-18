@@ -68,6 +68,10 @@ internal/
   watch/               Real-time hardware change monitoring (udev + polling)
 ```
 
+## Contact
+
+Open an issue or PR for anything you can. Otherwise: ghost@eonic.cloud.
+
 ## License
 
 MIT

@@ -1,9 +1,19 @@
 # Pinscher Changelog
 
+## Unreleased
+
+- **Fix: `internal/serve` test teardown error.** `Server.Close()` returned
+  `use of closed network connection` when `Serve` had already closed the
+  listener on context cancellation. `Close()` now treats an already-closed
+  listener as success. Reproduced on every run under
+  `go test -race -count=100 ./internal/serve` before the fix; clean after.
+  This was test teardown, not a daemon bug.
+
 ## v0.9.3 — fixes from the first real Debian/Ubuntu run
 
-First live run of the Debian path (Ubuntu 24.04, Falcon Northwest "fragbox",
-2026-10-18, by Ghost). Everything below was invisible on Arch and on the dev VM.
+First live run of the Debian path (Ubuntu 24.04, an ASUS Maximus III GENE /
+i7-875K desktop, 2026-10-18). Everything below was invisible on Arch and on
+the dev VM.
 
 - **`lint-boot` auto-detect now finds Debian/Ubuntu initramfs**
   (`/boot/initrd.img-<ver>`, `/boot/initrd.img`). Previously only Arch paths
@@ -13,8 +23,9 @@ First live run of the Debian path (Ubuntu 24.04, Falcon Northwest "fragbox",
 - **Device lookup accepts short PCI addresses** (`01:00.0`, as `lspci` prints)
   as well as full sysfs form (`0000:01:00.0`).
 - Test fix: assert test picks a PCI device (an ACPI device broke it).
-- Known, not fixed: `internal/serve` tests report a `Close: use of closed
-  network connection` cleanup error under `-race` (test teardown, not the daemon).
+- Known at the time: `internal/serve` tests reported a `Close: use of closed
+  network connection` cleanup error under `-race` (test teardown, not the
+  daemon). Fixed afterwards; see Unreleased.
 
 ## v0.9.2 — `lint-boot --assert`
 
@@ -59,16 +70,15 @@ in the real code or this systemd unit — `pinscher-boot-check.service` is
 just a logger today, no gating/revert logic. Worth not repeating that
 assumption elsewhere.)*
 
-*Added by Ghost, 2026-10-17, parallel lane to Ami's event-schema work —
-verified via real unit tests (`internal/lintboot/assert_test.go`,
-`cmd/pinscher/flags_test.go`; the CLI path itself couldn't be exercised
-end-to-end on the dev host, which has no initramfs/`lsinitcpio` to lint against).*
+*Verified via unit tests (`internal/lintboot/assert_test.go`,
+`cmd/pinscher/flags_test.go`). The CLI path itself couldn't be exercised
+end-to-end on the dev host, which has no initramfs to lint against.*
 
 ---
 
 ## v0.9.1 — Serve Daemon + diff can fail
 
-Merged divergent lines: Annie's v0.9.0 serve daemon + Ghost's v0.8.1
+Merged divergent lines: the v0.9.0 serve daemon + the v0.8.1
 `diff --fail-on-change` — both shipped separately from forks of v0.8.0;
 combined here without losing either narrative.
 
@@ -87,10 +97,10 @@ aren't surprised by this release.
 pinscher diff before.json after.json --fail-on-change || echo "something changed"
 ```
 
-*Added by Ghost, 2026-10-17, while Peter was away — verified live (forced a
-driver-field diff between two real snapshots, confirmed exit 0→1 only with
-the flag present, confirmed default path still exits 0). Ami: flag it if
-this should be the default instead of opt-in.*
+*Verified live on 2026-10-17: forced a driver-field diff between two real
+snapshots and confirmed exit 0→1 only with the flag present, and that the
+default path still exits 0. Whether this should become the default instead of
+opt-in is an open question.*
 
 ---
 
@@ -129,20 +139,9 @@ the existing checks.
 - Blocked params are skipped with an explanation rather than silently applied
 - Custom JSON profile files, plus legacy key=value files for backward compat
 - `--dry-run` support, JSON output for all subcommands
->>>>>>> ghost-sync
-### From v0.8.1 (Ghost)
 
-### New: `pinscher diff --fail-on-change`
+---
 
-`diff` previously always exited 0, even when it found real differences —
-discovered while writing the fleet/enterprise docs (a passthrough-regression
-check assumed `diff` could gate a reboot via `&&`/`||`; it couldn't, no
-matter what flags existed). `--fail-on-change` exits 1 if any differences are
-found; default behavior (always exit 0) is unchanged so existing scripts
-aren't surprised by this release.
-
-
-### From v0.9.0 (Annie) — Serve Daemon
 ## v0.9.0 — Serve Daemon (Persistent Hardware Intelligence Layer)
 
 ### New: `pinscher serve`

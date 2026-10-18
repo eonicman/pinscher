@@ -56,7 +56,7 @@ func TestApplyProfileFormat(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Write a test profile
-	content := `# Test profile for Annie (Mac Pro 6,1)
+	content := `# Test profile for a Mac Pro 6,1
 amdgpu.si_support=1
 amdgpu.dc=1
 # This is a comment

@@ -25,7 +25,7 @@ type QuirkDatabase struct {
 // Embedded quirks — each entry has provenance
 var Database = QuirkDatabase{
 	Quirks: []Quirk{
-		// AMD FirePro D700 / Tahiti XT (Annie's GPUs)
+		// AMD FirePro D700 / Tahiti XT (Mac Pro 6,1 GPUs)
 		{
 			ID:          "amdgpu-tahiti-xt-si-support",
 			DeviceIDs:   []string{"1002:6799", "1002:6798", "1002:679a"},
@@ -56,7 +56,7 @@ var Database = QuirkDatabase{
 			Severity:    "warning",
 			Verified:    true,
 		},
-		// Fresco Logic FL1100 USB 3.0 host controller (Annie's USB 3.0)
+		// Fresco Logic FL1100 USB 3.0 host controller (Mac Pro 6,1 USB 3.0)
 		{
 			ID:          "fl1100-usb3-firmware",
 			DeviceIDs:   []string{"1b73:1100"},

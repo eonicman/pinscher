@@ -162,7 +162,7 @@ func cmdLintBoot() {
 	// that currently relies on none of them failing the unit. Changing that
 	// silently could stop later steps from running and flip the unit to
 	// "failed" on every boot with so much as an info-level finding. Needs a
-	// deliberate decision (Ami/Peter), not a quiet fix bundled in here — so
+	// deliberate decision by the maintainers, not a quiet fix bundled in here — so
 	// this PR only makes --assert (brand new, zero existing dependents)
 	// honest, and leaves the older gap as a documented, open finding.
 	if asserts := flagValues("--assert"); len(asserts) > 0 {
@@ -595,7 +595,7 @@ func cmdDiff() {
 	// a --fail-on flag could do this; the real gap was the exit code, not
 	// the flag name). Opt-in rather than changing the default, so any
 	// existing script relying on diff always exiting 0 isn't surprised by
-	// this release. Ami: flag it if you'd rather this be the default.
+	// this release. Making it the default is an open question.
 	if hasFlag("--fail-on-change") && len(events) > 0 {
 		os.Exit(1)
 	}
