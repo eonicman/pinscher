@@ -131,7 +131,7 @@ func probePCI() ([]Device, error) {
 		d.Vendor = strings.TrimPrefix(readSysFile(filepath.Join(path, "vendor")), "0x")
 		d.DeviceID = strings.TrimPrefix(readSysFile(filepath.Join(path, "device")), "0x")
 		d.Subsystem = strings.TrimPrefix(readSysFile(filepath.Join(path, "subsystem_vendor")), "0x") + ":" + strings.TrimPrefix(readSysFile(filepath.Join(path, "subsystem_device")), "0x")
-		d.Class = readSysFile(filepath.Join(path, "class"))
+		d.Class = NormalizePCIClass(readSysFile(filepath.Join(path, "class")))
 		d.Revision = readSysFile(filepath.Join(path, "revision"))
 		d.Modalias = readSysFile(filepath.Join(path, "modalias"))
 
@@ -803,4 +803,13 @@ func (r *ProbeResult) JSON() (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// NormalizePCIClass turns the raw sysfs class value ("0x010601") into the form
+// the rest of Pinscher compares against: lowercase hex without the "0x"
+// prefix ("010601"). It was dropped for the class field in an early commit,
+// which silently stopped lint-boot from matching any PCI device (found
+// 2026-10-19 on a real Ubuntu run); keep it here, in one place.
+func NormalizePCIClass(raw string) string {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(raw)), "0x")
 }

@@ -73,6 +73,25 @@ var bootCriticalPlatformModalias = map[string]string{
 	"platform:applesmc": "input", // Apple SMC (fans, sensors, lid)
 }
 
+// bootCriticalCategory maps a PCI class code to a boot-critical category
+// ("storage", "usb", "gpu", ...). It accepts the class with or without a
+// leading "0x" and in either case, tries the 6-digit form (base class +
+// subclass + interface) first, then the 4-digit form (base class + subclass).
+func bootCriticalCategory(class string) (string, bool) {
+	class = probe.NormalizePCIClass(class)
+	if len(class) >= 6 {
+		if c, ok := bootCriticalClasses[class[:6]]; ok {
+			return c, true
+		}
+	}
+	if len(class) >= 4 {
+		if c, ok := bootCriticalClasses[class[:4]]; ok {
+			return c, true
+		}
+	}
+	return "", false
+}
+
 // LintBoot checks that the initramfs contains drivers for all boot-critical hardware
 func LintBoot(initramfsPath string) (*LintResult, error) {
 	result := &LintResult{
@@ -116,25 +135,13 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 		// --- PCI boot-critical check ---
 		if dev.Bus == "pci" {
 			// Determine if this device class is boot-critical
-			classCode := dev.Class
-			if len(classCode) >= 6 {
-				classCode = classCode[:6] // bcXXsc (base class + subclass)
-			}
-
-			category, critical := bootCriticalClasses[classCode]
-			if !critical {
-				// Also try 4-char prefix (bcXX)
-				if len(dev.Class) >= 4 {
-					classCode = dev.Class[:4]
-					category, critical = bootCriticalClasses[classCode]
-				}
-			}
+			category, critical := bootCriticalCategory(dev.Class)
 			if !critical {
 				continue
 			}
 
 			// Resolve modalias to module(s) — may return multiple
-			modules := resolveModaliasAll(dev.Modalias)
+			modules := modulesToCheck(dev.Driver, resolveModaliasAll(dev.Modalias))
 			if len(modules) == 0 {
 				continue
 			}
@@ -161,16 +168,16 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 						Device:   dev.Description,
 						Module:   module,
 						Message:  fmt.Sprintf("%s module '%s' is missing from initramfs — %s may not work at boot", category, module, category),
-						Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
+						Fix:      fixText(module, result.Initramfs),
 					}
 
 					// Enhance message for specific categories
 					if category == "usb" {
 						issue.Message = fmt.Sprintf("USB host controller driver '%s' missing from initramfs — keyboard may be dead at LUKS prompt", module)
-						issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
+						issue.Fix = fixText(module, result.Initramfs)
 					} else if category == "storage" {
 						issue.Message = fmt.Sprintf("Storage controller driver '%s' missing from initramfs — root filesystem may not mount", module)
-						issue.Fix = fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
+						issue.Fix = fixText(module, result.Initramfs)
 					}
 
 					result.Issues = append(result.Issues, issue)
@@ -210,7 +217,7 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 								Device:   dev.Description,
 								Module:   module,
 								Message:  fmt.Sprintf("Platform driver '%s' for %s is missing from initramfs", module, dev.Description),
-								Fix:      fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module),
+								Fix:      fixText(module, result.Initramfs),
 							}
 							result.Issues = append(result.Issues, issue)
 						}
@@ -234,7 +241,10 @@ func LintBoot(initramfsPath string) (*LintResult, error) {
 func listInitramfsModules(path string) ([]string, error) {
 	// Use lsinitcpio (Arch Linux) or lsinitramfs (Debian) to list modules
 	// Try lsinitcpio first (we're on CachyOS/Arch)
-	cmd := exec.Command("lsinitcpio", "-a", path)
+	// Plain `lsinitcpio <img>` lists files. `-a` is an analysis mode that prints a
+	// summary with no .ko paths, which made every module look missing on
+	// Arch/CachyOS (found 2026-10-19).
+	cmd := exec.Command("lsinitcpio", path)
 	output, err := cmd.Output()
 	if err != nil {
 		// Try lsinitramfs as fallback
@@ -245,26 +255,26 @@ func listInitramfsModules(path string) ([]string, error) {
 		}
 	}
 
+	return parseModuleList(string(output)), nil
+}
+
+// parseModuleList extracts kernel module names from an initramfs file listing
+// (lsinitcpio / lsinitramfs output): any line ending in .ko, .ko.zst, .ko.xz
+// or .ko.gz, reduced to the module name with '-' turned into '_'.
+func parseModuleList(output string) []string {
 	var modules []string
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
-		// Look for .ko files in the initramfs
 		if strings.HasSuffix(line, ".ko") || strings.HasSuffix(line, ".ko.zst") || strings.HasSuffix(line, ".ko.xz") || strings.HasSuffix(line, ".ko.gz") {
-			// Extract module name from path
 			base := filepath.Base(line)
-			// Remove .ko and compression extension
 			base = strings.TrimSuffix(base, ".ko.zst")
 			base = strings.TrimSuffix(base, ".ko.xz")
 			base = strings.TrimSuffix(base, ".ko.gz")
 			base = strings.TrimSuffix(base, ".ko")
-			// Replace dashes with underscores (kernel module naming)
-			base = strings.ReplaceAll(base, "-", "_")
-			modules = append(modules, base)
+			modules = append(modules, normalizeModuleName(base))
 		}
 	}
-
-	return modules, nil
+	return modules
 }
 
 // resolveModalias uses modprobe --resolve-alias to find the module(s) for a modalias
@@ -304,36 +314,111 @@ func isBuiltinModule(module, kernelVersion string) bool {
 	if err != nil {
 		return false
 	}
-	// Check if module appears in the builtin list
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, module+".ko") {
+	return moduleInBuiltinList(string(data), module)
+}
+
+// moduleInBuiltinList reports whether module appears in the text of a
+// modules.builtin file. The kernel treats '-' and '_' in module names as the
+// same character, and modules.builtin spells names with dashes where modprobe
+// aliases use underscores (ehci-pci.ko vs ehci_pci). It compares whole file
+// names, so "ahci" is not matched by "libahci". Found 2026-10-19: a
+// substring match on the underscore spelling flagged built-in drivers as
+// missing from the initramfs.
+func moduleInBuiltinList(builtinList, module string) bool {
+	want := normalizeModuleName(module)
+	for _, line := range strings.Split(builtinList, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasSuffix(line, ".ko") {
+			continue
+		}
+		if normalizeModuleName(strings.TrimSuffix(filepath.Base(line), ".ko")) == want {
 			return true
 		}
 	}
 	return false
 }
 
-// findInitramfs finds the default initramfs for the running kernel
+// normalizeModuleName lowercases a module name and treats '-' as '_'.
+func normalizeModuleName(name string) string {
+	return strings.ReplaceAll(strings.ToLower(name), "-", "_")
+}
+
+// findInitramfs finds the default initramfs for the running kernel.
 func findInitramfs(kernelVersion string) string {
-	// Arch Linux locations first, then Debian/Ubuntu (initramfs-tools).
-	// Debian-family paths added by Ghost, 2026-10-18, after a real run on
-	// Ubuntu 24.04 (fragbox) reported "no initramfs found" -- the Debian
-	// path of lint-boot had never been exercised on real hardware before.
-	candidates := []string{
+	return findInitramfsIn("", kernelVersion)
+}
+
+// findInitramfsIn is findInitramfs with a filesystem root prefix, so tests can
+// use a temporary directory. root "" means the real filesystem.
+//
+// Arch-family kernels name the image after the kernel package ("pkgbase"),
+// e.g. /boot/initramfs-linux-cachyos.img, not after the version; the first
+// real run on CachyOS (Annie, 2026-10-19) found nothing. Debian/Ubuntu paths
+// were added after the first run there (fragbox, 2026-10-18).
+func findInitramfsIn(root, kernelVersion string) string {
+	var candidates []string
+	for _, dir := range []string{"/usr/lib/modules", "/lib/modules"} {
+		if base := readSysFile(filepath.Join(root, dir, kernelVersion, "pkgbase")); base != "" {
+			candidates = append(candidates,
+				fmt.Sprintf("/boot/initramfs-%s.img", base),
+				fmt.Sprintf("/boot/initramfs-%s-fallback.img", base))
+			break
+		}
+	}
+	candidates = append(candidates,
 		fmt.Sprintf("/boot/initramfs-%s.img", kernelVersion),
 		fmt.Sprintf("/boot/initramfs-%s-fallback.img", kernelVersion),
 		"/boot/initramfs-linux.img",
 		"/boot/initramfs-linux-fallback.img",
 		fmt.Sprintf("/boot/initrd.img-%s", kernelVersion),
 		"/boot/initrd.img",
-	}
+	)
 	for _, c := range candidates {
-		if _, err := os.Stat(c); err == nil {
-			return c
+		if _, err := os.Stat(filepath.Join(root, c)); err == nil {
+			return filepath.Join(root, c)
 		}
 	}
+	// Last resort: exactly one non-fallback initramfs in /boot.
+	matches, _ := filepath.Glob(filepath.Join(root, "/boot/initramfs-*.img"))
+	var plain []string
+	for _, m := range matches {
+		if !strings.Contains(m, "fallback") {
+			plain = append(plain, m)
+		}
+	}
+	if len(plain) == 1 {
+		return plain[0]
+	}
 	return ""
+}
+
+// modulesToCheck picks the modules that matter for a boot-critical device.
+// modprobe --resolve-alias also returns sibling drivers that never bind (for
+// example amdgpu for an old Radeon that uses radeon), which produced false
+// "missing from initramfs" warnings. If the driver bound at runtime is one of
+// the alias matches, check only that one; otherwise (for example xhci_hcd vs
+// the xhci_pci module) keep every alias match.
+func modulesToCheck(boundDriver string, aliasModules []string) []string {
+	if boundDriver == "" {
+		return aliasModules
+	}
+	want := normalizeModuleName(boundDriver)
+	for _, m := range aliasModules {
+		if normalizeModuleName(m) == want {
+			return []string{m}
+		}
+	}
+	return aliasModules
+}
+
+// fixText returns the suggested fix for a module missing from the initramfs,
+// matched to the tool that built it (initramfs-tools on Debian/Ubuntu,
+// mkinitcpio on Arch).
+func fixText(module, initramfsPath string) string {
+	if strings.Contains(filepath.Base(initramfsPath), "initrd.img") {
+		return fmt.Sprintf("Add '%s' to /etc/initramfs-tools/modules and regenerate: sudo update-initramfs -u", module)
+	}
+	return fmt.Sprintf("Add '%s' to MODULES in /etc/mkinitcpio.conf and regenerate: sudo mkinitcpio -P", module)
 }
 
 func severityForCategory(category string) string {

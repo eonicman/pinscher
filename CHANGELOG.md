@@ -1,6 +1,52 @@
 # Pinscher Changelog
 
-## Unreleased
+## v0.9.4 — lint-boot actually checks PCI devices now (important fix)
+
+**If you ran v0.9.3 or earlier, `lint-boot` was not checking your PCI hardware.**
+On real systems it skipped every storage, USB, GPU and network device and could
+still print "All clear". It was found on 2026-10-19 by running it as a normal
+user on two real machines and reading the numbers ("1 boot-critical device
+checked" on a machine with SATA, USB, graphics and Ethernet). Nothing in the
+test suite covered it. Everything below was found that way and now has
+regression tests.
+
+- **PCI class codes kept sysfs's `0x` prefix** (`0x010601`), but `lint-boot`'s
+  table of boot-critical classes has no prefix, so no PCI device ever matched.
+  An early commit ("fix vendor/device ID normalization") dropped the
+  normalization for the class field only. Fixed in one place
+  (`probe.NormalizePCIClass`). Side effects fixed too: class names in the
+  report (`Storage Controller`, ...), `profile` class matching and
+  `--assert class:...` all depend on the same field.
+- **Built-in drivers were flagged as missing.** The built-in check was a
+  substring match on the underscore name (`ehci_pci`) against a list that spells
+  it with a dash (`ehci-pci.ko`), so a built-in driver produced a false FATAL
+  ("keyboard may be dead at LUKS prompt") on a machine that boots fine. It now
+  compares whole names and treats `-` and `_` as equal.
+- **Alias matches that never bind were flagged.** `modprobe --resolve-alias`
+  also lists sibling drivers (for example `amdgpu` for an old Radeon that uses
+  `radeon`). If the driver bound at runtime is among the matches, only that one
+  is checked.
+- **Arch-family kernels with a package suffix were not found.**
+  `/boot/initramfs-linux-cachyos.img` (and `linux-lts`, `linux-zen`, ...) gave
+  "no initramfs found". Lookup now uses the kernel's `pkgbase`, then falls back
+  to a single unambiguous `/boot/initramfs-*.img`.
+- **On Arch/CachyOS no modules were ever listed.** `lint-boot` ran
+  `lsinitcpio -a`, which prints a summary without file paths, so every module
+  looked missing. It now runs plain `lsinitcpio`.
+- **Fix suggestions matched the wrong distro.** Ubuntu/Debian images
+  (`initrd.img-*`) now get `/etc/initramfs-tools/modules` +
+  `update-initramfs -u`; Arch images keep the mkinitcpio text.
+- **README exit-code note corrected.** `lint-boot` exits 1 for any issue found
+  in human mode (not only FATAL), and `--json` mode does not set the exit code
+  (known gap, unchanged; use `--assert` to gate).
+
+Re-checked on real hardware after the fixes: Ubuntu 24.04 (6 devices checked, 1
+true warning: `radeon` is not in the initramfs) and CachyOS on a Mac Pro 6,1 (11
+devices checked, 2 true warnings: `tg3`, `wl`). A deliberately stripped test
+initramfs produces the expected FATAL storage and USB findings.
+
+### Also in this release (earlier unreleased work)
+
 
 - **New: `pinscher report --anonymize`.** A plain report contains the hostname
   and, on machines with WiFi or Bluetooth, full MAC addresses, and

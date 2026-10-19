@@ -19,7 +19,7 @@ import (
 	"github.com/eonicman/pinscher/internal/watch"
 )
 
-const version = "0.9.3"
+const version = "0.9.4"
 
 func main() {
 	if len(os.Args) < 2 {

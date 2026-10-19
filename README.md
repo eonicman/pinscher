@@ -5,7 +5,7 @@ between the kernel and OS-level AI agents. It discovers hardware, diagnoses driv
 failures, and exposes a structured API for querying, configuring, and grouping
 subsystems by intent.
 
-**Status:** v0.9.3, pre-1.0. Probing across six buses, `lint-boot`, diagnosis, a
+**Status:** v0.9.4, pre-1.0. Probing across six buses, `lint-boot`, diagnosis, a
 22-entry quirk database, hardware profiles, watch and diff, a `serve` daemon
 exposing the JSON API over a local Unix socket, and an opt-in driver-synthesis
 proposer. See [CONCEPT.md](CONCEPT.md) for the longer-term design, which is
@@ -19,6 +19,20 @@ send; see [CONTRIBUTING.md](CONTRIBUTING.md).
 Built by AI agents as part of the [Built by Bots](https://github.com/eonicman) project.
 
 *(Note: it's Pinscher — with the s. The dog, not the grip.)*
+
+## Help test Pinscher
+
+It has been tested on **two machines**. Run it on yours and tell us what happened,
+including "it worked fine": see [TESTING.md](TESTING.md) (5 minutes, read-only
+commands) and open a
+[hardware test report](https://github.com/eonicman/pinscher/issues/new?template=hardware-report.yml).
+
+| Hardware | Distro / kernel | `lint-boot` result | Tested by |
+|----------|-----------------|--------------------|-----------|
+| 2013 Apple Mac Pro 6,1 (Xeon E5-2697 v2, FirePro D700) | CachyOS, 7.1.8 | 11 devices checked, 2 warnings (`tg3`, `wl` not in initramfs) | project team |
+| ASUS Maximus III GENE (i7-875K, Radeon HD 5850) | Ubuntu 24.04, 7.0.0-38 | 6 devices checked, 1 warning (`radeon` not in initramfs) | project team |
+
+Your machine goes here once you report it.
 
 ## Installation
 
@@ -66,7 +80,18 @@ pinscher lint-boot /boot/initramfs-linux.img
 pinscher lint-boot --json
 ```
 
-Exit code 1 if any FATAL issues found.
+What it checks: PCI storage, USB host, GPU, network and a few other boot-critical
+device classes, plus ACPI/platform buttons, against the modules listed in your
+initramfs (built-in kernel drivers count as present). Severity: storage and USB
+are FATAL, GPU and network are WARNING, crypto is INFO. It does not check
+firmware blobs, kernel parameters or initramfs hooks.
+
+Exit code: in the default (human) mode it exits 1 if **any** issue is found
+(fatal, warning or info). `--json` does not set the exit code; use
+`lint-boot --assert ...` for gating scripts.
+
+> **Upgrade note:** v0.9.3 and earlier did not actually match PCI devices on real
+> systems and could report "All clear". Fixed in v0.9.4; see the changelog.
 
 ### `pinscher diagnose <device>`
 Deep diagnosis of a single device. Accepts PCI address, vendor:device ID,

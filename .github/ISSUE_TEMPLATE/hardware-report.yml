@@ -1,0 +1,68 @@
+name: Hardware test report
+description: Tell us how Pinscher did on your machine (it worked, something looked wrong, or it broke)
+title: "[hardware] "
+labels: ["hardware-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Pinscher. Every report, including "it worked fine", helps. See [TESTING.md](../blob/main/TESTING.md) for the 5-minute steps.
+        **Privacy:** run `pinscher report --json --anonymize` so your hostname and MAC addresses are hidden. Pinscher only reads from your system when you use `report`, `lint-boot` and `diagnose`; it never changes anything unless you run `set`, `apply` or `serve --allow-write`.
+  - type: input
+    id: distro
+    attributes:
+      label: Distro and version
+      placeholder: "Ubuntu 24.04, CachyOS (rolling), Fedora 41..."
+    validations:
+      required: true
+  - type: input
+    id: kernel
+    attributes:
+      label: Kernel (output of `uname -r`)
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Machine, CPU and GPU
+      placeholder: "ThinkPad T480s, i7-8650U, Intel UHD 620"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Pinscher version (output of `pinscher version`)
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: How did it go?
+      options:
+        - It worked and the output looked right
+        - It worked but something looked wrong
+        - It crashed or printed an error
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: lintboot
+    attributes:
+      label: Output of `pinscher lint-boot`
+      render: text
+  - type: textarea
+    id: report
+    attributes:
+      label: Output of `pinscher report --json --anonymize` (optional, long reports can be attached as a file)
+      render: json
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else? What looked wrong?
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I used `--anonymize` (or removed hostname, MAC addresses and serial numbers) before pasting.
+          required: true
