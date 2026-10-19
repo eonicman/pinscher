@@ -34,7 +34,7 @@ commands) and open a
 
 Your machine goes here once you report it.
 
-Prefer to watch first? The 3:47 technical walkthrough, with real captures and the bug we shipped and fixed: https://www.youtube.com/watch?v=2vGjGzlXTvA
+Prefer to watch first? The 3:47 technical walkthrough, with real captures and the bug we shipped and fixed: https://www.youtube.com/watch?v=HVHA7-6HlIk
 
 ## Installation
 
