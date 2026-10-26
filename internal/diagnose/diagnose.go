@@ -427,15 +427,6 @@ func readModuleParam(module, param string) string {
 	return strings.TrimSpace(string(data))
 }
 
-// readKernelVersion returns the running kernel version
-func readKernelVersion() string {
-	data, err := os.ReadFile("/proc/sys/kernel/osrelease")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
-
 // JSON returns the diagnose result as formatted JSON
 func (r *DiagnoseResult) JSON() (string, error) {
 	data, err := json.MarshalIndent(r, "", "  ")

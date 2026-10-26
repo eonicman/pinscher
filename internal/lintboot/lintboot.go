@@ -277,16 +277,6 @@ func parseModuleList(output string) []string {
 	return modules
 }
 
-// resolveModalias uses modprobe --resolve-alias to find the module(s) for a modalias
-// Returns the first resolved module, or empty string if none found
-func resolveModalias(modalias string) string {
-	modules := resolveModaliasAll(modalias)
-	if len(modules) > 0 {
-		return modules[0]
-	}
-	return ""
-}
-
 // resolveModaliasAll returns all modules resolved for a modalias
 func resolveModaliasAll(modalias string) []string {
 	if modalias == "" {

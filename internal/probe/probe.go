@@ -44,6 +44,8 @@ type Summary struct {
 }
 
 // Probe walks sysfs and discovers all hardware devices
+var usbDeviceName = regexp.MustCompile(`^\d+-\d`)
+
 func Probe() (*ProbeResult, error) {
 	hostname, _ := os.Hostname()
 	kernel := readSysFile("/proc/sys/kernel/osrelease")
@@ -165,8 +167,7 @@ func probeUSB() ([]Device, error) {
 	for _, entry := range devices {
 		name := entry.Name()
 		// USB devices have names like "1-2", "2-1.3" — skip host controllers ("usb1", "usb2")
-		matched, _ := regexp.MatchString(`^\d+-\d`, name)
-		if !matched {
+		if !usbDeviceName.MatchString(name) {
 			continue
 		}
 

@@ -87,11 +87,11 @@ func GenerateIssue(deviceQuery string, includeProbe bool) (string, string, error
 	sb.WriteString("### Proposed Quirk\n\n")
 	sb.WriteString("```yaml\n")
 	sb.WriteString("id: \n")
-	sb.WriteString(fmt.Sprintf("device_ids:\n"))
+	sb.WriteString("device_ids:\n")
 	sb.WriteString(fmt.Sprintf("  - \"%s:%s\"\n", device.Vendor, device.DeviceID))
-	sb.WriteString(fmt.Sprintf("device_names:\n"))
+	sb.WriteString("device_names:\n")
 	sb.WriteString(fmt.Sprintf("  - \"%s\"\n", device.Description))
-	sb.WriteString(fmt.Sprintf("category: \n"))
+	sb.WriteString("category: \n")
 	driverDefault := device.Driver
 	if driverDefault == "" {
 		driverDefault = "(unknown)"
