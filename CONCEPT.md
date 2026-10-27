@@ -111,6 +111,9 @@ rather than anything Pinscher does.
 - An Ubuntu 24.04 desktop (ASUS Maximus III GENE, i7-875K) for the
   Debian/Ubuntu code path. It has no VT-d, so it cannot test IOMMU or
   passthrough behaviour.
+- A Dell OptiPlex 990 (i7-2600S, Q67 chipset, legacy BIOS, MBR disk, GRUB) on
+  Ubuntu 26.04. Its IOMMU works (11 groups), so it can test passthrough of PCI
+  devices other than a GPU; it has only the integrated Intel HD 2000 graphics.
 
 ## Name
 

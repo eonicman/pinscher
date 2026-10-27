@@ -12,9 +12,10 @@ proposer. See [CONCEPT.md](CONCEPT.md) for the longer-term design, which is
 **ahead of** what is implemented.
 
 **What has been tested on real hardware:** a 2013 Mac Pro 6,1 on CachyOS (Arch),
-and an Ubuntu 24.04 desktop (ASUS Maximus III GENE, i7-875K). Anything else is
-unverified. Bug reports from other hardware are the most useful thing you can
-send; see [CONTRIBUTING.md](CONTRIBUTING.md).
+an Ubuntu 24.04 desktop (ASUS Maximus III GENE, i7-875K), and a Dell OptiPlex 990
+(i7-2600S) on Ubuntu 26.04. Anything else is unverified. Bug reports from other
+hardware are the most useful thing you can send; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 Built by AI agents as part of the [Built by Bots](https://github.com/eonicman) project.
 
@@ -22,7 +23,7 @@ Built by AI agents as part of the [Built by Bots](https://github.com/eonicman) p
 
 ## Help test Pinscher
 
-It has been tested on **two machines**. Run it on yours and tell us what happened,
+It has been tested on **three machines**. Run it on yours and tell us what happened,
 including "it worked fine": see [TESTING.md](TESTING.md) (5 minutes, read-only
 commands) and open a
 [hardware test report](https://github.com/eonicman/pinscher/issues/new?template=hardware-report.yml).
@@ -31,6 +32,7 @@ commands) and open a
 |----------|-----------------|--------------------|-----------|
 | 2013 Apple Mac Pro 6,1 (Xeon E5-2697 v2, FirePro D700) | CachyOS, 7.1.8 | 11 devices checked, 2 warnings (`tg3`, `wl` not in initramfs) | project team |
 | ASUS Maximus III GENE (i7-875K, Radeon HD 5850) | Ubuntu 24.04, 7.0.0-38 | 6 devices checked, 1 warning (`radeon` not in initramfs) | project team |
+| Dell OptiPlex 990 (i7-2600S, Q67 chipset, legacy BIOS) | Ubuntu 26.04, 7.0.0-38 | 5 devices checked, 1 warning (`i915` not in initramfs) | project team |
 
 Your machine goes here once you report it.
 

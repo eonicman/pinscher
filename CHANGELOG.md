@@ -1,5 +1,16 @@
 # Pinscher Changelog
 
+## Unreleased
+
+- **Tested on a third real machine:** a Dell OptiPlex 990 (i7-2600S, Q67
+  chipset, legacy BIOS) on Ubuntu 26.04: 5 devices checked, 1 warning (`i915` is
+  not in the initramfs, which is accurate: the kernel log shows the integrated GPU
+  driver loading after the root filesystem is mounted). The anonymized report
+  hid the hostname and MAC addresses as intended.
+- Internal cleanup from `staticcheck`: removed two unused functions, compile the
+  USB device-name pattern once instead of per device, dropped redundant
+  `fmt.Sprintf` calls. No behaviour change.
+
 ## v0.9.4 — lint-boot actually checks PCI devices now (important fix)
 
 **If you ran v0.9.3 or earlier, `lint-boot` was not checking your PCI hardware.**
